@@ -834,8 +834,8 @@ NeverLose.LoadIcon = LPH_NO_VIRTUALIZE(function()
 end);
 
 NeverLose.IsMouseOverFrame = LPH_NO_VIRTUALIZE(function(self , Frame)
-	if not Frame then
-		return;
+	if not Frame or not Frame.Parent then
+		return false;
 	end;
 
 	if NeverLose.Global3DRenderMode then
@@ -846,11 +846,13 @@ NeverLose.IsMouseOverFrame = LPH_NO_VIRTUALIZE(function(self , Frame)
 		return false;
 	end;
 
+	local mousePos = UserInputService:GetMouseLocation();
 	local AbsPos: Vector2, AbsSize: Vector2 = Frame.AbsolutePosition, Frame.AbsoluteSize;
 
-	if Mouse.X >= AbsPos.X and Mouse.X <= AbsPos.X + AbsSize.X and Mouse.Y >= AbsPos.Y and Mouse.Y <= AbsPos.Y + AbsSize.Y then
+	if mousePos.X >= AbsPos.X and mousePos.X <= (AbsPos.X + AbsSize.X) and mousePos.Y >= AbsPos.Y and mousePos.Y <= (AbsPos.Y + AbsSize.Y) then
 		return true;
 	end;
+	return false;
 end);
 
 NeverLose.CreateSignal = LPH_NO_VIRTUALIZE(function(self , DefaultValue)
@@ -1391,6 +1393,17 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 	Payback.Window = Window;
 	Payback.Root = OptionHandler;
 	Payback.Signal = Window.Signal;
+	Payback.Frame = Frame;
+
+	function Payback:IsMouseOverSelfOrDescendant()
+		return Window:IsMouseOverSelfOrDescendant();
+	end;
+
+	function Payback:CloseDescendants()
+		return Window:CloseDescendants();
+	end;
+
+	table.insert(NeverLose.ActiveOptionWindows, Payback);
 
 	NeverLose:RegisterPopupClose(function()
 		if Window.Signal:GetValue() then
@@ -2276,6 +2289,15 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 		Signal:Connect(Window.SetRender);
 
 		local bthg = NeverLose:CreateInput(Option , LPH_NO_VIRTUALIZE(function()
+			if Window.Signal:GetValue() then
+				if reciveSignal then
+					reciveSignal:Disconnect();
+					reciveSignal = nil;	
+				end;
+				Window.Signal:SetValue(false);
+				return;
+			end;
+
 			if reciveSignal then
 				reciveSignal:Disconnect();
 				reciveSignal = nil;	
@@ -2283,16 +2305,20 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 
 			Window.Signal:SetValue(true);
 
-			reciveSignal = UserInputService.InputBegan:Connect(function(Input)
-				if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-					if not Window:IsMouseOverSelfOrDescendant() and not NeverLose.IsMosueOverOtherFrame then
-						if reciveSignal then
-							reciveSignal:Disconnect();
-							reciveSignal = nil;	
-						end;
+			task.defer(function()
+				if not reciveSignal and Window.Signal:GetValue() then
+					reciveSignal = UserInputService.InputBegan:Connect(function(Input)
+						if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+							if not Window:IsMouseOverSelfOrDescendant() then
+								if reciveSignal then
+									reciveSignal:Disconnect();
+									reciveSignal = nil;	
+								end;
 
-						Window.Signal:SetValue(false);
-					end
+								Window.Signal:SetValue(false);
+							end
+						end
+					end)
 				end
 			end)
 		end));
