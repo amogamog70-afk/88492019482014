@@ -205,6 +205,18 @@ NeverLose.NameRegisitry = {};
 NeverLose.IsMosueOverOtherFrame = false;
 NeverLose.GlobalLogo = "rbxassetid://120358385035996";
 NeverLose.ImageColorMapping = "rbxassetid://4155801252";
+NeverLose.PopupCloseHandlers = {};
+
+function NeverLose:RegisterPopupClose(closeFn)
+	table.insert(NeverLose.PopupCloseHandlers, closeFn);
+end;
+
+function NeverLose:CloseAllPopups()
+	NeverLose.IsMosueOverOtherFrame = false;
+	for _, closeFn in ipairs(NeverLose.PopupCloseHandlers) do
+		pcall(closeFn);
+	end;
+end;
 
 if getcustomasset then
 	local link = "https://github.com/4lpaca-pin/NeverLose/blob/main/assets/%s?raw=true";
@@ -1355,6 +1367,12 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 	Payback.Root = OptionHandler;
 	Payback.Signal = Window.Signal;
 
+	NeverLose:RegisterPopupClose(function()
+		if Window.Signal:GetValue() then
+			Window.Signal:SetValue(false);
+		end;
+	end);
+
 	return Payback;
 end;
 
@@ -1575,6 +1593,10 @@ function NeverLose:CreateColorPicker(HandleFrame: Frame)
 	ColorPickerLib.S = 1;
 	ColorPickerLib.V = 1;
 	ColorPickerLib.Callback = EmptyFunction;
+
+	NeverLose:RegisterPopupClose(function()
+		ColorPickerLib.SetRender(false);
+	end);
 
 	function ColorPickerLib:Update()
 		local RealColor = Color3.fromHSV(ColorPickerLib.H , ColorPickerLib.S , ColorPickerLib.V);
@@ -2237,7 +2259,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 
 			reciveSignal = UserInputService.InputBegan:Connect(function(Input)
 				if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-					if not NeverLose:IsMouseOverFrame(Window.Root) and not NeverLose:IsMouseOverFrame(Option) then
+					if not NeverLose:IsMouseOverFrame(Window.Root) and not NeverLose:IsMouseOverFrame(Option) and not NeverLose.IsMosueOverOtherFrame then
 						if reciveSignal then
 							reciveSignal:Disconnect();
 							reciveSignal = nil;	
@@ -2338,6 +2360,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			end;
 
 			BackendM.SetRender(true);
+			NeverLose.IsMosueOverOtherFrame = true;
 
 			signal = UserInputService.InputBegan:Connect(function(Input)
 				if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
@@ -2347,6 +2370,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 							signal = nil;
 						end;
 
+						NeverLose.IsMosueOverOtherFrame = false;
 						BackendM.SetRender(false);
 					end;
 				end;
@@ -2913,6 +2937,19 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 		end;
 
 		local SecureSignal;
+		DropdownLib.CloseDropdown = function()
+			if SecureSignal then
+				SecureSignal:Disconnect();
+				SecureSignal = nil;
+			end;
+			NeverLose.IsMosueOverOtherFrame = false;
+			DropdownLib.SetFrameRender(false);
+		end;
+
+		NeverLose:RegisterPopupClose(function()
+			DropdownLib.CloseDropdown();
+		end);
+
 		NeverLose:CreateInput(Dropdown , LPH_NO_VIRTUALIZE(function()
 			if SecureSignal then
 				SecureSignal:Disconnect();
@@ -3121,6 +3158,8 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 						BasedLabel.Text = NeverLose.ParseDropdown(Config.Default);
 
 						Config.Callback(Config.Default);
+
+						DropdownLib.CloseDropdown();
 					end));
 
 					table.insert(DropdownLib.Signals , bth_signal);
@@ -3846,6 +3885,7 @@ function NeverLose:CreateWindow(Config)
 		Size = UDim2.new(0, 640, 0, 480),
 		ConfigFolder = "NeverLoseConfigs",
 		Enable3DRenderer = false,
+		AutoLoadDefault = false,
 		Keybind = "Insert"
 	});
 
@@ -3855,6 +3895,7 @@ function NeverLose:CreateWindow(Config)
 		Content = Config.Content,
 		Size = Config.Size,
 		ConfigFolder = Config.ConfigFolder,
+		AutoLoadDefault = Config.AutoLoadDefault,
 		Signal = NeverLose:CreateSignal(true),
 		Tabs = {},
 		CurrentTab = 1,
@@ -4038,6 +4079,7 @@ function NeverLose:CreateWindow(Config)
 
 			Window.Shadow:Render(true);
 		else
+			NeverLose:CloseAllPopups();
 
 			NeverLose.PlayAnimate(WindowFrame , SlowyTween , {
 				BackgroundTransparency = 1,
@@ -5386,6 +5428,14 @@ function NeverLose:CreateWindow(Config)
 		ConfigLib.UnsafeThread = nil;
 		ConfigLib.SelectedConfig = "Default";
 
+		NeverLose:RegisterPopupClose(function()
+			if ConfigLib.UnsafeThread then
+				ConfigLib.UnsafeThread:Disconnect();
+				ConfigLib.UnsafeThread = nil;
+			end;
+			ConfigSignal:SetValue(false);
+		end);
+
 		local UpdateSize = LPH_NO_VIRTUALIZE(function()
 			local size = TextService:GetTextSize(ConfigName.Text , ConfigName.TextSize,ConfigName.Font,Vector2.new(math.huge,math.huge));
 
@@ -5725,8 +5775,10 @@ function NeverLose:CreateWindow(Config)
 			table.clear(ConfigList);
 		end;
 		
+		Window.ConfigLib = ConfigLib;
+
 		task.delay(1,function()
-			if ConfigLib.SelectedConfig == "Default" then
+			if Window.AutoLoadDefault and ConfigLib.SelectedConfig == "Default" then
 				local path = Window.ConfigFolder..'/Default';
 				local ConfigNameStr = "Default";
 				
@@ -5910,7 +5962,11 @@ function NeverLose:CreateWindow(Config)
 	end)));
 
 	function Window:ToggleInterface()
-		Window.Signal:SetValue(not Window.Signal:GetValue());
+		local nextVal = not Window.Signal:GetValue();
+		if not nextVal then
+			NeverLose:CloseAllPopups();
+		end;
+		Window.Signal:SetValue(nextVal);
 
 		if Window.__3DRender then
 			Window.Load3DBlock();
