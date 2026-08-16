@@ -3435,7 +3435,12 @@ function NeverLose:CreateToolTips(Container: Frame , Name: string , Content: str
 end;
 
 function NeverLose:RegisiterItem(Frame: Frame , Signel)
-	local idx = {};
+	local idx = {
+		Root = Frame,
+		Handler = Frame,
+		Frame = Frame,
+		Signal = Signel,
+	};
 	local LayerIndex = Frame.ZIndex;
 
 	function idx:AddLabel(Name: string,Warp: boolean)
@@ -5087,6 +5092,11 @@ function NeverLose:CreateWindow(Config)
 			end));
 
 			local Section = NeverLose:RegisiterItem(SectionHandler , Tab.Signal);
+			Section.Frame = SectionFrame;
+			Section.Handler = SectionHandler;
+			Section.Root = SectionHandler;
+			Section.Label = SectionLabel;
+			Section.Signal = Tab.Signal;
 
 			Section.SetRender = LPH_NO_VIRTUALIZE(function(value)
 				if value then
