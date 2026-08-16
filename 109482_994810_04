@@ -821,6 +821,19 @@ NeverLose.LoadIcon = LPH_NO_VIRTUALIZE(function()
 	};
 end);
 
+NeverLose.IsMouseOverFrame = LPH_NO_VIRTUALIZE(function(self , Frame)
+	if not Frame then
+		return;
+	end;
+
+	if NeverLose.Global3DRenderMode then
+		if Frame.GuiState == Enum.GuiState.Hover or Frame.GuiState == Enum.GuiState.Press then
+			return true;
+		end;
+
+		return false;
+	end;
+
 	local AbsPos: Vector2, AbsSize: Vector2 = Frame.AbsolutePosition, Frame.AbsoluteSize;
 
 	if Mouse.X >= AbsPos.X and Mouse.X <= AbsPos.X + AbsSize.X and Mouse.Y >= AbsPos.Y and Mouse.Y <= AbsPos.Y + AbsSize.Y then
