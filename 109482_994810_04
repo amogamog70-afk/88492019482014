@@ -1281,23 +1281,25 @@ NeverLose.ActiveOptionWindows = NeverLose.ActiveOptionWindows or {};
 
 local function IsAncestorOf(ancestor, target)
 	if not ancestor or not target then return false end
-	if ancestor == target then return true end
-	if ancestor.Window and (ancestor.Window == target or ancestor.Window == target.Window) then return true end
-	if target.Window and (target.Window == ancestor or target.Window == ancestor.Window) then return true end
-	local cur = target.ParentWindow
+	local rawAncestor = ancestor.Window or ancestor
+	local rawTarget = target.Window or target
+	if rawAncestor == rawTarget then return true end
+	local cur = rawTarget.ParentWindow
 	while cur do
-		if cur == ancestor or cur == ancestor.Window then return true end
-		if cur.Window and (cur.Window == ancestor or cur.Window == ancestor.Window) then return true end
-		cur = cur.ParentWindow
+		local rawCur = cur.Window or cur
+		if rawCur == rawAncestor then return true end
+		cur = rawCur.ParentWindow
 	end
 	return false
 end
 
 function NeverLose:CloseOtherOptionBranches(targetWindow)
+	local rawTarget = targetWindow.Window or targetWindow
 	for _, other in ipairs(NeverLose.ActiveOptionWindows or {}) do
-		if other ~= targetWindow and other.Signal and other.Signal.GetValue and other.Signal:GetValue() then
-			if not IsAncestorOf(other, targetWindow) then
-				pcall(function() other.Signal:SetValue(false) end)
+		local rawOther = other.Window or other
+		if rawOther ~= rawTarget and rawOther.Signal and rawOther.Signal.GetValue and rawOther.Signal:GetValue() then
+			if not IsAncestorOf(rawOther, rawTarget) then
+				pcall(function() rawOther.Signal:SetValue(false) end)
 			end
 		end
 	end
@@ -1316,7 +1318,7 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 		for _, existing in ipairs(NeverLose.ActiveOptionWindows) do
 			local root = existing.Root or (existing.Window and existing.Window.Root)
 			if root and Frame:IsDescendantOf(root) then
-				Window.ParentWindow = existing
+				Window.ParentWindow = existing.Window or existing
 				break
 			end
 		end
@@ -1482,6 +1484,7 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 	Payback.Root = OptionHandler;
 	Payback.Signal = Window.Signal;
 	Payback.Frame = Frame;
+	Payback.ParentWindow = Window.ParentWindow;
 	Payback.IsMouseOverHierarchy = function(self)
 		return Window:IsMouseOverHierarchy();
 	end;
@@ -2384,7 +2387,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			UpdateOptionVisual(val, false)
 		end)
 
-		Window.SetRender = LPH_NO_VIRTUALIZE(function(value)
+		local function SetOptionVisualState(value)
 			if value then
 				UpdateOptionVisual(Window.Signal:GetValue(), false)
 			else
@@ -2399,11 +2402,11 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 						Transparency = 1
 					})
 				end
-			end;
-		end);
+			end
+		end
 
-		Window.SetRender(Signal:GetValue());
-		Signal:Connect(Window.SetRender);
+		SetOptionVisualState(Signal:GetValue());
+		Signal:Connect(SetOptionVisualState);
 
 		local bthg = NeverLose:CreateInput(Option , LPH_NO_VIRTUALIZE(function()
 			local isOpen = Window.Signal:GetValue();
