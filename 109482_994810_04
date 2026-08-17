@@ -6449,6 +6449,14 @@ function NeverLose:CreateWindow(Config)
 		return Watermark_lb;
 	end;
 
+	function Window:ToggleInterface()
+		local isOpen = Window.Signal:GetValue()
+		if isOpen then
+			NeverLose:CloseAllPopups(Window)
+		end
+		Window.Signal:SetValue(not isOpen)
+	end;
+
 	Window:SetRender(false);
 
 	return Window;
