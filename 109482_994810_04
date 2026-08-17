@@ -1331,8 +1331,7 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 	function Window:CloseHierarchy()
 		for _, other in ipairs(NeverLose.ActiveOptionWindows) do
 			if other ~= Window and other.Signal and other.Signal.GetValue and other.Signal:GetValue() then
-				local oFrame = other.Frame;
-				if oFrame and oFrame:IsDescendantOf(OptionHandler) then
+				if IsAncestorOf(Window, other) or (other.Frame and other.Frame:IsDescendantOf(OptionHandler)) then
 					pcall(function() other.Signal:SetValue(false); end);
 				end;
 			end;
