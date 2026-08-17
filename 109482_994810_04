@@ -1333,6 +1333,7 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 	local shadow = NeverLose:CreateShadow(OptionHandler);
 
 	OptionHandler.Name = NeverLose.RandomString();
+	OptionHandler:SetAttribute("IsOptionWindow", true);
 	OptionHandler.Parent = NeverLose.ScreenGui
 	OptionHandler.AnchorPoint = Vector2.new(0, 0)
 	OptionHandler.BackgroundColor3 = Color3.fromRGB(20, 22, 27)
@@ -1410,27 +1411,48 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 		if frameX == 0 and frameY == 0 and frameW == 0 then return end
 
 		local targetH = (OptionHandler.AbsoluteSize.Y > 20 and OptionHandler.AbsoluteSize.Y) or (UIListLayout.AbsoluteContentSize.Y + 4) or 100
+		local targetW = (OptionHandler.AbsoluteSize.X > 50 and OptionHandler.AbsoluteSize.X) or 220
 
-		local rightEdge = frameX + frameW
-		if Frame.Parent and Frame.Parent:IsA("GuiObject") then
-			local pRight = Frame.Parent.AbsolutePosition.X + Frame.Parent.AbsoluteSize.X
-			if pRight > rightEdge then
-				rightEdge = pRight
+		local posX
+		local posY = frameY - 4
+
+		if Window.ParentWindow and Window.ParentWindow.Root and Window.ParentWindow.Root.Parent then
+			local parentRoot = Window.ParentWindow.Root
+			local pX = parentRoot.AbsolutePosition.X
+			local pY = parentRoot.AbsolutePosition.Y
+			local pW = parentRoot.AbsoluteSize.X
+
+			if pX + pW + targetW + 10 <= screenX then
+				posX = pX + pW + 8
+			else
+				posX = math.max(10, pX - targetW - 8)
+			end
+
+			posY = frameY - 4
+			if posY + targetH > screenY - 15 then
+				posY = math.max(10, math.min(frameY, screenY - targetH - 15))
+			end
+		else
+			local rightEdge = frameX + frameW
+			if Frame.Parent and Frame.Parent:IsA("GuiObject") then
+				local pRight = Frame.Parent.AbsolutePosition.X + Frame.Parent.AbsoluteSize.X
+				if pRight > rightEdge then
+					rightEdge = pRight
+				end
+			end
+
+			posX = rightEdge + 8
+			if posX + targetW > screenX then
+				posX = math.max(10, frameX - targetW - 8)
+			end
+
+			posY = frameY - 4
+			if posY + targetH > screenY - 15 then
+				posY = math.max(10, screenY - targetH - 15)
 			end
 		end
 
-		local posX = rightEdge + 8
-		if posX + 225 > screenX then
-			posX = math.max(10, frameX - 228)
-		end
-
-		local posY = frameY - 2
-		if posY + targetH > screenY - 15 then
-			posY = math.max(10, screenY - targetH - 15)
-		end
-		if posY < 10 then
-			posY = 10
-		end
+		posY = math.max(10, posY)
 
 		OptionHandler.AnchorPoint = Vector2.new(0, 0)
 		OptionHandler.Position = UDim2.fromOffset(math.floor(posX), math.floor(posY))
@@ -2405,7 +2427,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 		Option.ClipsDescendants = true
 		Option.Size = UDim2.new(0, 20, 0, 18)
 		Option.ZIndex = ZINdex + 13
-		Option.LayoutOrder = -(#Handler:GetChildren() + 5);
+		Option.LayoutOrder = 1;
 
 		Icon.Name = NeverLose.RandomString();
 		Icon.Parent = Option
@@ -3644,11 +3666,17 @@ function NeverLose:CreateToolTips(Container: Frame , Name: string , Content: str
 end;
 
 function NeverLose:RegisiterItem(Frame: Frame , Signel)
+	local isOpt = false;
+	pcall(function()
+		isOpt = (Frame:GetAttribute("IsOptionWindow") == true);
+	end);
+
 	local idx = {
 		Root = Frame,
 		Handler = Frame,
 		Frame = Frame,
 		Signal = Signel,
+		IsOptionWindow = isOpt,
 	};
 	local LayerIndex = Frame.ZIndex;
 
@@ -3668,6 +3696,7 @@ function NeverLose:RegisiterItem(Frame: Frame , Signel)
 		BasedFrame.BorderSizePixel = 0
 		BasedFrame.Size = UDim2.new(1, 0, 0, 30)
 		BasedFrame.ZIndex = LayerIndex + 8
+		BasedFrame.LayoutOrder = #Frame:GetChildren() + 1
 
 		NeverLose:AddQuery(BasedFrame , Name);
 
@@ -3733,7 +3762,7 @@ function NeverLose:RegisiterItem(Frame: Frame , Signel)
 			UpdateWarp();
 		end;
 
-		if idx.IsOptionWindow or Frame.IsOptionWindow then
+		if idx.IsOptionWindow then
 			LineFrame.Visible = false;
 			LineFrame.BackgroundTransparency = 1;
 		end;
@@ -3752,7 +3781,7 @@ function NeverLose:RegisiterItem(Frame: Frame , Signel)
 					TextTransparency = 0.35
 				})
 
-				if not (idx.IsOptionWindow or Frame.IsOptionWindow) then
+				if not idx.IsOptionWindow then
 					NeverLose.PlayAnimate(LineFrame , SlowyTween , {
 						BackgroundTransparency = 0.650
 					})
