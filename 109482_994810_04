@@ -884,6 +884,35 @@ NeverLose.CreateSignal = LPH_NO_VIRTUALIZE(function(self , DefaultValue)
 	return bind;
 end);
 
+NeverLose.PopupCloseCallbacks = {};
+
+function NeverLose:RegisterPopupClose(callback)
+	if typeof(callback) == "function" then
+		table.insert(self.PopupCloseCallbacks, callback);
+	end;
+end;
+
+function NeverLose:CloseAllPopups(window)
+	if self.PopupCloseCallbacks then
+		for _, fn in ipairs(self.PopupCloseCallbacks) do
+			pcall(fn);
+		end;
+	end;
+	if window then
+		if window.UserSettings and window.UserSettings.Signal then
+			pcall(function() window.UserSettings.Signal:SetValue(false); end);
+		end;
+		if window.ConfigLib and window.ConfigLib.SetRender then
+			pcall(function() window.ConfigLib.SetRender(false); end);
+		end;
+	end;
+	for _, other in ipairs(self.ActiveOptionWindows or {}) do
+		if other and other.Signal and other.Signal.GetValue and other.Signal:GetValue() then
+			pcall(function() other.Signal:SetValue(false); end);
+		end;
+	end;
+end;
+
 NeverLose.SetIconMode = LPH_NO_VIRTUALIZE(function(self , Label: TextLabel , Icon: string)
 	local useBold = string.lower(string.sub(Icon , -5)) == '-bold';
 
@@ -1253,9 +1282,12 @@ NeverLose.ActiveOptionWindows = NeverLose.ActiveOptionWindows or {};
 local function IsAncestorOf(ancestor, target)
 	if not ancestor or not target then return false end
 	if ancestor == target then return true end
+	if ancestor.Window and (ancestor.Window == target or ancestor.Window == target.Window) then return true end
+	if target.Window and (target.Window == ancestor or target.Window == ancestor.Window) then return true end
 	local cur = target.ParentWindow
 	while cur do
-		if cur == ancestor then return true end
+		if cur == ancestor or cur == ancestor.Window then return true end
+		if cur.Window and (cur.Window == ancestor or cur.Window == ancestor.Window) then return true end
 		cur = cur.ParentWindow
 	end
 	return false
@@ -1282,7 +1314,8 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 
 	if Frame then
 		for _, existing in ipairs(NeverLose.ActiveOptionWindows) do
-			if existing.Root and Frame:IsDescendantOf(existing.Root) then
+			local root = existing.Root or (existing.Window and existing.Window.Root)
+			if root and Frame:IsDescendantOf(root) then
 				Window.ParentWindow = existing
 				break
 			end
@@ -1304,10 +1337,19 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 	OptionHandler.BackgroundTransparency = 0.035
 	OptionHandler.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	OptionHandler.BorderSizePixel = 0
-	OptionHandler.ClipsDescendants = true
+	OptionHandler.ClipsDescendants = false
 	OptionHandler.Position = UDim2.new(255,255,255,255)
 	OptionHandler.Size = UDim2.new(0, 220, 0, 75)
 	OptionHandler.ZIndex = Zindex + 9
+
+	UICorner.CornerRadius = UDim.new(0, 6)
+	UICorner.Parent = OptionHandler
+
+	UIStroke.Color = Color3.fromRGB(45, 48, 58)
+	UIStroke.Transparency = 0.650
+	UIStroke.Thickness = 1
+	UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	UIStroke.Parent = OptionHandler
 
 	Window.Root = OptionHandler;
 
@@ -1340,36 +1382,40 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 
 	NeverLose:AddSignal(UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(LPH_NO_VIRTUALIZE(function()
 		NeverLose.PlayAnimate(OptionHandler , SlowyTween , {
-			Size = UDim2.new(0, 220, 0, UIListLayout.AbsoluteContentSize.Y - 1)
+			Size = UDim2.new(0, 220, 0, UIListLayout.AbsoluteContentSize.Y + 4)
 		})
-	end)));
-
-	NeverLose:AddSignal(OptionHandler:GetPropertyChangedSignal('BackgroundTransparency'):Connect(LPH_NO_VIRTUALIZE(function()
-		if OptionHandler.BackgroundTransparency > 0.9 then
-			OptionHandler.Visible = false;
-			UIListLayout.Parent = nil;
-			OptionHandler.Parent = nil;
-		else
-			OptionHandler.Visible = true;
-			UIListLayout.Parent = OptionHandler
-
-			if NeverLose.Global3DRenderMode then
-				OptionHandler.Parent = NeverLose.GlobalSurfaceGui;
-			else
-				OptionHandler.Parent = NeverLose.ScreenGui;
-			end;
-		end
 	end)));
 
 	local FollowingThread;
 	local SetPosition = LPH_NO_VIRTUALIZE(function()
-		if NeverLose:MoreThanHalfY(Frame.AbsolutePosition.Y + 65) then
-			OptionHandler.AnchorPoint = Vector2.new(0,1)
-		else
-			OptionHandler.AnchorPoint = Vector2.new(0,0)
-		end;
+		local screenX = 1920
+		local screenY = 1080
+		pcall(function()
+			local vp = workspace.CurrentCamera.ViewportSize
+			if vp and vp.X > 100 then
+				screenX = vp.X
+				screenY = vp.Y
+			end
+		end)
 
-		OptionHandler.Position = UDim2.fromOffset(Frame.AbsolutePosition.X + 18 , Frame.AbsolutePosition.Y + 65);
+		local frameX = Frame.AbsolutePosition.X
+		local frameY = Frame.AbsolutePosition.Y
+		local frameW = Frame.AbsoluteSize.X
+		local frameH = Frame.AbsoluteSize.Y
+
+		local isBottomHalf = (screenY > 0) and (frameY > screenY * 0.65)
+		local posX = frameX + frameW + 8
+		if posX + 225 > screenX then
+			posX = math.max(10, frameX - 228)
+		end
+
+		if isBottomHalf then
+			OptionHandler.AnchorPoint = Vector2.new(0, 1)
+			OptionHandler.Position = UDim2.fromOffset(posX, frameY + frameH + 4)
+		else
+			OptionHandler.AnchorPoint = Vector2.new(0, 0)
+			OptionHandler.Position = UDim2.fromOffset(posX, frameY - 4)
+		end
 	end);
 
 	Window.SetRender = LPH_NO_VIRTUALIZE(function(value)
@@ -1382,6 +1428,14 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 			NeverLose:CloseOtherOptionBranches(Window);
 			SetPosition();
 
+			OptionHandler.Visible = true;
+			if NeverLose.Global3DRenderMode then
+				OptionHandler.Parent = NeverLose.GlobalSurfaceGui;
+			else
+				OptionHandler.Parent = NeverLose.ScreenGui;
+			end;
+			UIListLayout.Parent = OptionHandler;
+
 			NeverLose.PlayAnimate(OptionHandler , SlowyTween , {
 				BackgroundTransparency = 0.035
 			})
@@ -1391,12 +1445,6 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 			})
 
 			shadow:Render(true);
-
-			if NeverLose.Global3DRenderMode then
-				OptionHandler.Parent = NeverLose.GlobalSurfaceGui;
-			else
-				OptionHandler.Parent = NeverLose.ScreenGui;
-			end;
 
 			FollowingThread = task.spawn(function()
 				while true do task.wait()
@@ -1415,6 +1463,12 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 			})
 
 			shadow:Render(false);
+
+			task.delay(0.2, function()
+				if not Window.Signal:GetValue() then
+					OptionHandler.Visible = false;
+				end
+			end)
 		end;
 	end);
 
@@ -1434,8 +1488,6 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 	Payback.CloseHierarchy = function(self)
 		return Window:CloseHierarchy();
 	end;
-
-	table.insert(NeverLose.ActiveOptionWindows, Payback);
 
 	return Payback;
 end;
@@ -2342,9 +2394,11 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 				NeverLose.PlayAnimate(Option , SlowyTween , {
 					BackgroundTransparency = 1
 				})
-				NeverLose.PlayAnimate(OptionStroke , SlowyTween , {
-					Transparency = 1
-				})
+				if OptionStroke then
+					NeverLose.PlayAnimate(OptionStroke , SlowyTween , {
+						Transparency = 1
+					})
+				end
 			end;
 		end);
 
