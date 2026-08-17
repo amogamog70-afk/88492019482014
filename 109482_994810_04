@@ -830,16 +830,29 @@ NeverLose.IsMouseOverFrame = LPH_NO_VIRTUALIZE(function(self , Frame)
 		if Frame.GuiState == Enum.GuiState.Hover or Frame.GuiState == Enum.GuiState.Press then
 			return true;
 		end;
-
 		return false;
 	end;
 
-	local mousePos = UserInputService:GetMouseLocation();
-	local AbsPos: Vector2, AbsSize: Vector2 = Frame.AbsolutePosition, Frame.AbsoluteSize;
-
-	if mousePos.X >= AbsPos.X and mousePos.X <= (AbsPos.X + AbsSize.X) and mousePos.Y >= AbsPos.Y and mousePos.Y <= (AbsPos.Y + AbsSize.Y) then
+	if Frame.GuiState == Enum.GuiState.Hover or Frame.GuiState == Enum.GuiState.Press then
 		return true;
 	end;
+
+	local AbsPos: Vector2, AbsSize: Vector2 = Frame.AbsolutePosition, Frame.AbsoluteSize;
+	local minX, maxX = AbsPos.X, AbsPos.X + AbsSize.X;
+	local minY, maxY = AbsPos.Y, AbsPos.Y + AbsSize.Y;
+
+	local mLoc = UserInputService:GetMouseLocation();
+	if mLoc.X >= minX and mLoc.X <= maxX and mLoc.Y >= minY and mLoc.Y <= maxY then
+		return true;
+	end;
+
+	if Mouse then
+		local mX, mY = Mouse.X, Mouse.Y;
+		if mX >= minX and mX <= maxX and mY >= minY and mY <= maxY then
+			return true;
+		end;
+	end;
+
 	return false;
 end);
 
@@ -1272,14 +1285,12 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 			return true;
 		end;
 		for _, other in ipairs(NeverLose.ActiveOptionWindows) do
-			if other ~= Window and other.Signal and other.Signal:GetValue() then
-				local oFrame = other.Frame;
-				if oFrame and oFrame:IsDescendantOf(OptionHandler) then
-					if other.IsMouseOverHierarchy and other:IsMouseOverHierarchy() then
-						return true;
-					elseif NeverLose:IsMouseOverFrame(other.Root) or (other.Frame and NeverLose:IsMouseOverFrame(other.Frame)) then
-						return true;
-					end;
+			if other ~= Window and other.Signal and other.Signal.GetValue and other.Signal:GetValue() then
+				if other.Root and other.Root.Parent and NeverLose:IsMouseOverFrame(other.Root) then
+					return true;
+				end;
+				if other.Frame and other.Frame.Parent and NeverLose:IsMouseOverFrame(other.Frame) then
+					return true;
 				end;
 			end;
 		end;
@@ -1288,7 +1299,7 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 
 	function Window:CloseHierarchy()
 		for _, other in ipairs(NeverLose.ActiveOptionWindows) do
-			if other ~= Window and other.Signal and other.Signal:GetValue() then
+			if other ~= Window and other.Signal and other.Signal.GetValue and other.Signal:GetValue() then
 				local oFrame = other.Frame;
 				if oFrame and oFrame:IsDescendantOf(OptionHandler) then
 					pcall(function() other.Signal:SetValue(false); end);
