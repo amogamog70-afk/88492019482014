@@ -2284,38 +2284,8 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 		Signal:Connect(Window.SetRender);
 
 		local bthg = NeverLose:CreateInput(Option , LPH_NO_VIRTUALIZE(function()
-			if Window.Signal:GetValue() then
-				if reciveSignal then
-					reciveSignal:Disconnect();
-					reciveSignal = nil;	
-				end;
-				Window.Signal:SetValue(false);
-				return;
-			end;
-
-			if reciveSignal then
-				reciveSignal:Disconnect();
-				reciveSignal = nil;	
-			end;
-
-			Window.Signal:SetValue(true);
-
-			task.defer(function()
-				if not reciveSignal and Window.Signal:GetValue() then
-					reciveSignal = UserInputService.InputBegan:Connect(function(Input)
-						if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-							if not Window:IsMouseOverHierarchy() then
-								if reciveSignal then
-									reciveSignal:Disconnect();
-									reciveSignal = nil;	
-								end;
-
-								Window.Signal:SetValue(false);
-							end
-						end
-					end)
-				end
-			end);
+			local isOpen = Window.Signal:GetValue();
+			Window.Signal:SetValue(not isOpen);
 		end));
 
 		NeverLose:AddSignal(bthg.MouseEnter:Connect(LPH_NO_VIRTUALIZE(function()
@@ -2399,39 +2369,8 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			Config.Callback(Config.Default);
 		end;
 
-		local signal;
-		local CloseColorPicker = function()
-			if signal then
-				signal:Disconnect();
-				signal = nil;
-			end;
-			BackendM.SetRender(false);
-		end;
-
 		NeverLose:CreateInput(ColorPicker , LPH_NO_VIRTUALIZE(function()
-			if BackendM.IsOpen then
-				CloseColorPicker();
-				return;
-			end;
-
-			if signal then
-				signal:Disconnect();
-				signal = nil;
-			end;
-
-			BackendM.SetRender(true);
-
-			task.defer(function()
-				if not signal and BackendM.IsOpen then
-					signal = UserInputService.InputBegan:Connect(function(Input)
-						if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-							if not NeverLose:IsMouseOverFrame(ColorPicker) and not NeverLose:IsMouseOverFrame(BackendM.Root) then
-								CloseColorPicker();
-							end;
-						end;
-					end)
-				end
-			end);
+			BackendM.SetRender(not BackendM.IsOpen);
 		end));
 
 		ColorPickerLib.SetRender = LPH_NO_VIRTUALIZE(function(value)
@@ -2993,12 +2932,7 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 			DropdownLib.SetFrameRender(false);
 		end;
 
-		local SecureSignal;
 		DropdownLib.CloseDropdown = function()
-			if SecureSignal then
-				SecureSignal:Disconnect();
-				SecureSignal = nil;
-			end;
 			NeverLose.IsMosueOverOtherFrame = false;
 			DropdownLib.SetFrameRender(false);
 		end;
@@ -3008,30 +2942,13 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 		end);
 
 		NeverLose:CreateInput(Dropdown , LPH_NO_VIRTUALIZE(function()
-			if DropdownLib.OpenSignal:GetValue() then
+			local isOpen = DropdownLib.OpenSignal:GetValue();
+			if isOpen then
 				DropdownLib.CloseDropdown();
-				return;
+			else
+				DropdownLib.SetFrameRender(true);
+				NeverLose.IsMosueOverOtherFrame = true;
 			end;
-
-			if SecureSignal then
-				SecureSignal:Disconnect();
-				SecureSignal = nil;
-			end;
-
-			DropdownLib.SetFrameRender(true);
-			NeverLose.IsMosueOverOtherFrame = true;
-
-			task.defer(function()
-				if not SecureSignal and DropdownLib.OpenSignal:GetValue() then
-					SecureSignal = UserInputService.InputBegan:Connect(function(Input)
-						if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-							if not NeverLose:IsMouseOverFrame(DropdownLib.BlockRoot) and not NeverLose:IsMouseOverFrame(Dropdown) then
-								DropdownLib.CloseDropdown();
-							end;
-						end
-					end)
-				end
-			end);
 		end))
 
 		DropdownLib.IsMatch = LPH_NO_VIRTUALIZE(function(v1)
