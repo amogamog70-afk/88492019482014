@@ -1501,7 +1501,7 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 			shadow:Render(true);
 
 			FollowingThread = task.spawn(function()
-				while true do task.wait()
+				while true do task.wait(0.05)
 					SetPosition();
 				end
 			end)
