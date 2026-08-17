@@ -3733,6 +3733,11 @@ function NeverLose:RegisiterItem(Frame: Frame , Signel)
 			UpdateWarp();
 		end;
 
+		if idx.IsOptionWindow or Frame.IsOptionWindow then
+			LineFrame.Visible = false;
+			LineFrame.BackgroundTransparency = 1;
+		end;
+
 		local handle = NeverLose:RegisiterHandler(BasedHandler , Signel);
 
 		handle.Root = BasedFrame;
@@ -3747,9 +3752,14 @@ function NeverLose:RegisiterItem(Frame: Frame , Signel)
 					TextTransparency = 0.35
 				})
 
-				NeverLose.PlayAnimate(LineFrame , SlowyTween , {
-					BackgroundTransparency = 0.650
-				})
+				if not (idx.IsOptionWindow or Frame.IsOptionWindow) then
+					NeverLose.PlayAnimate(LineFrame , SlowyTween , {
+						BackgroundTransparency = 0.650
+					})
+				else
+					LineFrame.BackgroundTransparency = 1;
+					LineFrame.Visible = false;
+				end;
 			else
 				NeverLose.PlayAnimate(BasedFrame , SlowyTween , {
 					BackgroundTransparency = 1
