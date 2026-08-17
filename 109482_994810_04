@@ -1337,7 +1337,7 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 	OptionHandler.Parent = NeverLose.ScreenGui
 	OptionHandler.AnchorPoint = Vector2.new(0, 0)
 	OptionHandler.BackgroundColor3 = Color3.fromRGB(20, 22, 27)
-	OptionHandler.BackgroundTransparency = 0.035
+	OptionHandler.BackgroundTransparency = 0
 	OptionHandler.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	OptionHandler.BorderSizePixel = 0
 	OptionHandler.ClipsDescendants = false
@@ -1349,7 +1349,7 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 	UICorner.Parent = OptionHandler
 
 	UIStroke.Color = Color3.fromRGB(45, 48, 58)
-	UIStroke.Transparency = 0.650
+	UIStroke.Transparency = 0.500
 	UIStroke.Thickness = 1
 	UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	UIStroke.Parent = OptionHandler
@@ -1425,7 +1425,15 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 			if pX + pW + targetW + 10 <= screenX then
 				posX = pX + pW + 8
 			else
-				posX = math.max(10, pX - targetW - 8)
+				local grandParent = Window.ParentWindow.ParentWindow
+				local grandRoot = grandParent and grandParent.Root
+				local leftmostX = (grandRoot and grandRoot.Parent and grandRoot.AbsolutePosition.X) or pX
+
+				if leftmostX - targetW - 8 >= 10 then
+					posX = leftmostX - targetW - 8
+				else
+					posX = math.max(10, pX - targetW - 8)
+				end
 			end
 
 			posY = frameY - 4
@@ -1441,8 +1449,9 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 				end
 			end
 
-			posX = rightEdge + 8
-			if posX + targetW > screenX then
+			if rightEdge + targetW + 10 <= screenX then
+				posX = rightEdge + 8
+			else
 				posX = math.max(10, frameX - targetW - 8)
 			end
 
