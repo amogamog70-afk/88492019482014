@@ -1332,6 +1332,11 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 	local UIStroke = Instance.new("UIStroke")
 	local shadow = NeverLose:CreateShadow(OptionHandler);
 
+	UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	UIListLayout.FillDirection = Enum.FillDirection.Vertical
+	UIListLayout.Padding = UDim.new(0, 0)
+	UIListLayout.Parent = OptionHandler
+
 	OptionHandler.Name = NeverLose.RandomString();
 	OptionHandler:SetAttribute("IsOptionWindow", true);
 	OptionHandler.Parent = NeverLose.ScreenGui
