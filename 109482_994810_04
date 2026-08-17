@@ -1250,13 +1250,44 @@ end;
 
 NeverLose.ActiveOptionWindows = NeverLose.ActiveOptionWindows or {};
 
+local function IsAncestorOf(ancestor, target)
+	if not ancestor or not target then return false end
+	if ancestor == target then return true end
+	local cur = target.ParentWindow
+	while cur do
+		if cur == ancestor then return true end
+		cur = cur.ParentWindow
+	end
+	return false
+end
+
+function NeverLose:CloseOtherOptionBranches(targetWindow)
+	for _, other in ipairs(NeverLose.ActiveOptionWindows or {}) do
+		if other ~= targetWindow and other.Signal and other.Signal.GetValue and other.Signal:GetValue() then
+			if not IsAncestorOf(other, targetWindow) then
+				pcall(function() other.Signal:SetValue(false) end)
+			end
+		end
+	end
+end
+
 function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 	Zindex = Zindex or 9;
 
 	local Window = {
 		Signal = NeverLose:CreateSignal(false),
 		Frame = Frame,
+		ParentWindow = nil,
 	};
+
+	if Frame then
+		for _, existing in ipairs(NeverLose.ActiveOptionWindows) do
+			if existing.Root and Frame:IsDescendantOf(existing.Root) then
+				Window.ParentWindow = existing
+				break
+			end
+		end
+	end
 
 	table.insert(NeverLose.ActiveOptionWindows, Window);
 
@@ -1349,6 +1380,7 @@ function NeverLose:CreateOptionWindow(Frame: Frame , Zindex)
 		end;
 
 		if value then
+			NeverLose:CloseOtherOptionBranches(Window);
 			SetPosition();
 
 			NeverLose.PlayAnimate(OptionHandler , SlowyTween , {
@@ -2285,7 +2317,12 @@ function NeverLose:RegisiterHandler(Handler: Frame , Signal)
 
 		local bthg = NeverLose:CreateInput(Option , LPH_NO_VIRTUALIZE(function()
 			local isOpen = Window.Signal:GetValue();
-			Window.Signal:SetValue(not isOpen);
+			if not isOpen then
+				NeverLose:CloseOtherOptionBranches(Window);
+				Window.Signal:SetValue(true);
+			else
+				Window.Signal:SetValue(false);
+			end;
 		end));
 
 		NeverLose:AddSignal(bthg.MouseEnter:Connect(LPH_NO_VIRTUALIZE(function()
