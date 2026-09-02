@@ -502,6 +502,137 @@ Subtitle.TextYAlignment = Enum.TextYAlignment.Center
 Subtitle.TextTruncate = Enum.TextTruncate.AtEnd
 Subtitle.Parent = Header
 
+-- Right Header Section: System & Session Metadata Badges (Session Time & Memory Usage)
+local HeaderStats = Instance.new("Frame")
+HeaderStats.Name = "HeaderStats"
+HeaderStats.Active = false
+HeaderStats.Size = UDim2.new(0, 0, 0, 24)
+HeaderStats.AutomaticSize = Enum.AutomaticSize.X
+HeaderStats.Position = UDim2.new(1, -18, 0.5, -12)
+HeaderStats.AnchorPoint = Vector2.new(1, 0)
+HeaderStats.BackgroundTransparency = 1
+HeaderStats.Parent = Header
+
+local HeaderStatsLayout = Instance.new("UIListLayout")
+HeaderStatsLayout.FillDirection = Enum.FillDirection.Horizontal
+HeaderStatsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+HeaderStatsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+HeaderStatsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+HeaderStatsLayout.Padding = UDim.new(0, 8)
+HeaderStatsLayout.Parent = HeaderStats
+
+-- 1. Session Duration Badge
+local SessionBadge = Instance.new("Frame")
+SessionBadge.Name = "SessionBadge"
+SessionBadge.Active = false
+SessionBadge.Size = UDim2.new(0, 0, 0, 24)
+SessionBadge.AutomaticSize = Enum.AutomaticSize.X
+SessionBadge.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+SessionBadge.BorderSizePixel = 0
+SessionBadge.LayoutOrder = 1
+SessionBadge.Parent = HeaderStats
+
+local SessionBadgeStroke = Instance.new("UIStroke")
+SessionBadgeStroke.Thickness = 1
+SessionBadgeStroke.Color = Color3.fromRGB(38, 40, 48)
+SessionBadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+SessionBadgeStroke.Parent = SessionBadge
+
+local SessionBadgePadding = Instance.new("UIPadding")
+SessionBadgePadding.PaddingLeft = UDim.new(0, 9)
+SessionBadgePadding.PaddingRight = UDim.new(0, 9)
+SessionBadgePadding.Parent = SessionBadge
+
+local SessionBadgeLayout = Instance.new("UIListLayout")
+SessionBadgeLayout.FillDirection = Enum.FillDirection.Horizontal
+SessionBadgeLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+SessionBadgeLayout.Padding = UDim.new(0, 6)
+SessionBadgeLayout.Parent = SessionBadge
+
+local SessionTag = Instance.new("TextLabel")
+SessionTag.Name = "SessionTag"
+SessionTag.Active = false
+SessionTag.Size = UDim2.new(0, 0, 1, 0)
+SessionTag.AutomaticSize = Enum.AutomaticSize.X
+SessionTag.BackgroundTransparency = 1
+SessionTag.Font = Enum.Font.GothamBold
+SessionTag.Text = "SESSION"
+SessionTag.TextSize = 9
+SessionTag.TextColor3 = Color3.fromRGB(230, 57, 70)
+SessionTag.TextXAlignment = Enum.TextXAlignment.Left
+SessionTag.TextYAlignment = Enum.TextYAlignment.Center
+SessionTag.Parent = SessionBadge
+
+local SessionVal = Instance.new("TextLabel")
+SessionVal.Name = "SessionVal"
+SessionVal.Active = false
+SessionVal.Size = UDim2.new(0, 0, 1, 0)
+SessionVal.AutomaticSize = Enum.AutomaticSize.X
+SessionVal.BackgroundTransparency = 1
+SessionVal.Font = Enum.Font.GothamBold
+SessionVal.Text = "00:00:00"
+SessionVal.TextSize = 10
+SessionVal.TextColor3 = Color3.fromRGB(225, 230, 240)
+SessionVal.TextXAlignment = Enum.TextXAlignment.Left
+SessionVal.TextYAlignment = Enum.TextYAlignment.Center
+SessionVal.Parent = SessionBadge
+
+-- 2. Memory Usage Badge
+local MemBadge = Instance.new("Frame")
+MemBadge.Name = "MemBadge"
+MemBadge.Active = false
+MemBadge.Size = UDim2.new(0, 0, 0, 24)
+MemBadge.AutomaticSize = Enum.AutomaticSize.X
+MemBadge.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+MemBadge.BorderSizePixel = 0
+MemBadge.LayoutOrder = 2
+MemBadge.Parent = HeaderStats
+
+local MemBadgeStroke = Instance.new("UIStroke")
+MemBadgeStroke.Thickness = 1
+MemBadgeStroke.Color = Color3.fromRGB(38, 40, 48)
+MemBadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+MemBadgeStroke.Parent = MemBadge
+
+local MemBadgePadding = Instance.new("UIPadding")
+MemBadgePadding.PaddingLeft = UDim.new(0, 9)
+MemBadgePadding.PaddingRight = UDim.new(0, 9)
+MemBadgePadding.Parent = MemBadge
+
+local MemBadgeLayout = Instance.new("UIListLayout")
+MemBadgeLayout.FillDirection = Enum.FillDirection.Horizontal
+MemBadgeLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+MemBadgeLayout.Padding = UDim.new(0, 6)
+MemBadgeLayout.Parent = MemBadge
+
+local MemTag = Instance.new("TextLabel")
+MemTag.Name = "MemTag"
+MemTag.Active = false
+MemTag.Size = UDim2.new(0, 0, 1, 0)
+MemTag.AutomaticSize = Enum.AutomaticSize.X
+MemTag.BackgroundTransparency = 1
+MemTag.Font = Enum.Font.GothamBold
+MemTag.Text = "MEM"
+MemTag.TextSize = 9
+MemTag.TextColor3 = Color3.fromRGB(230, 57, 70)
+MemTag.TextXAlignment = Enum.TextXAlignment.Left
+MemTag.TextYAlignment = Enum.TextYAlignment.Center
+MemTag.Parent = MemBadge
+
+local MemVal = Instance.new("TextLabel")
+MemVal.Name = "MemVal"
+MemVal.Active = false
+MemVal.Size = UDim2.new(0, 0, 1, 0)
+MemVal.AutomaticSize = Enum.AutomaticSize.X
+MemVal.BackgroundTransparency = 1
+MemVal.Font = Enum.Font.GothamBold
+MemVal.Text = "0 MB"
+MemVal.TextSize = 10
+MemVal.TextColor3 = Color3.fromRGB(225, 230, 240)
+MemVal.TextXAlignment = Enum.TextXAlignment.Left
+MemVal.TextYAlignment = Enum.TextYAlignment.Center
+MemVal.Parent = MemBadge
+
 ----------------------------------------------------------------------
 -- Left Sidebar Area (Fixed 190x475px, zero Scale calculation)
 ----------------------------------------------------------------------
@@ -1248,12 +1379,36 @@ local function isCursorOverMenu()
     return isDragging or isDraggingWM or isDraggingKB
 end
 
--- Watermark Metrics Updater Variables
+-- Watermark & Header Metrics Updater Variables
 local fpsFrames = 0
 local fpsTimer = 0
+local sessionStartTime = tick()
+local headerStatsTimer = 0
 
 -- RenderStepped: Handles Watermark Stats update (0.5s), Snappy & Smooth Dragging, and Background Tool Protection
 RunService.RenderStepped:Connect(function(dt)
+    -- 0. Header Live Metrics (Session Playtime & Client RAM)
+    headerStatsTimer += dt
+    if headerStatsTimer >= 0.5 then
+        headerStatsTimer = 0
+        if MainFrame.Visible and menuOpen then
+            local elapsed = math.floor(tick() - sessionStartTime)
+            local hrs = math.floor(elapsed / 3600)
+            local mins = math.floor((elapsed % 3600) / 60)
+            local secs = elapsed % 60
+            SessionVal.Text = string.format("%02d:%02d:%02d", hrs, mins, secs)
+
+            local memMb = 0
+            pcall(function()
+                memMb = math.floor(Stats:GetTotalMemoryUsageMb())
+            end)
+            if memMb == 0 then
+                memMb = math.floor(collectgarbage("count") / 1024)
+            end
+            MemVal.Text = tostring(memMb) .. " MB"
+        end
+    end
+
     -- 1. Watermark Realtime Stats (FPS, Ping, Clock)
     if WatermarkFrame.Visible then
         fpsFrames += 1
