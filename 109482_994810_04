@@ -654,6 +654,7 @@ ContentArea.Size = UDim2.new(0, 690, 0, 475)
 ContentArea.Position = UDim2.new(0, 190, 0, 55)
 ContentArea.BackgroundTransparency = 1
 ContentArea.BorderSizePixel = 0
+ContentArea.ClipsDescendants = true
 ContentArea.Parent = MainFrame
 
 ----------------------------------------------------------------------
@@ -1550,6 +1551,28 @@ UserInputService.InputChanged:Connect(function(input)
             local rawOffset = startPos + Vector2.new(deltaX, deltaY)
             targetOffset = clampMainFrameOffset(rawOffset)
         end
+    elseif input.UserInputType == Enum.UserInputType.MouseWheel then
+        -- Smooth Zero-GPE Mouse Wheel scrolling for Column cards
+        local scrollDelta = input.Position.Z
+        local mouse = UserInputService:GetMouseLocation()
+        local inset = GuiService:GetGuiInset()
+        local mx = mouse.X - inset.X
+        local my = mouse.Y - inset.Y
+
+        if activeTab and MainFrame.Visible and menuOpen then
+            local scrollSpeed = 40
+            if activeTab.leftScroll and isInside(mx, my, activeTab.leftScroll) then
+                local s = activeTab.leftScroll
+                local maxScroll = math.max(0, s.CanvasSize.Y.Offset - s.AbsoluteSize.Y)
+                local newY = math.clamp(s.CanvasPosition.Y - (scrollDelta * scrollSpeed), 0, maxScroll)
+                s.CanvasPosition = Vector2.new(0, newY)
+            elseif activeTab.rightScroll and isInside(mx, my, activeTab.rightScroll) then
+                local s = activeTab.rightScroll
+                local maxScroll = math.max(0, s.CanvasSize.Y.Offset - s.AbsoluteSize.Y)
+                local newY = math.clamp(s.CanvasPosition.Y - (scrollDelta * scrollSpeed), 0, maxScroll)
+                s.CanvasPosition = Vector2.new(0, newY)
+            end
+        end
     end
 end)
 
@@ -1781,6 +1804,7 @@ end
     -- Tabs and Pages Controller
     local tabsList = {}
     local tabCount = 0
+    local activeTab = nil
 
     function Window:CreateTab(tabName)
         tabCount += 1
@@ -1837,6 +1861,7 @@ end
         TabPage.Size = UDim2.new(1, 0, 1, 0)
         TabPage.BackgroundTransparency = 1
         TabPage.Visible = false
+        TabPage.ClipsDescendants = true
         TabPage.ZIndex = 20
         TabPage.Parent = ContentArea
 
@@ -1844,13 +1869,14 @@ end
         local LeftScroll = Instance.new("ScrollingFrame")
         LeftScroll.Name = "LeftScroll"
         LeftScroll.Active = false
-        LeftScroll.Size = UDim2.new(0, 324, 1, -24)
+        LeftScroll.Size = UDim2.new(0, 326, 1, -24)
         LeftScroll.Position = UDim2.new(0, 14, 0, 12)
         LeftScroll.BackgroundTransparency = 1
         LeftScroll.BorderSizePixel = 0
-        LeftScroll.ScrollBarThickness = 2
+        LeftScroll.ScrollBarThickness = 3
         LeftScroll.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
-        LeftScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        LeftScroll.ScrollBarImageTransparency = 0
+        LeftScroll.ClipsDescendants = true
         LeftScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         LeftScroll.ZIndex = 21
         LeftScroll.Parent = TabPage
@@ -1861,16 +1887,21 @@ end
         LeftLayout.Padding = UDim.new(0, 12)
         LeftLayout.Parent = LeftScroll
 
+        LeftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            LeftScroll.CanvasSize = UDim2.new(0, 0, 0, LeftLayout.AbsoluteContentSize.Y + 24)
+        end)
+
         local RightScroll = Instance.new("ScrollingFrame")
         RightScroll.Name = "RightScroll"
         RightScroll.Active = false
-        RightScroll.Size = UDim2.new(0, 324, 1, -24)
-        RightScroll.Position = UDim2.new(0, 352, 0, 12)
+        RightScroll.Size = UDim2.new(0, 326, 1, -24)
+        RightScroll.Position = UDim2.new(0, 350, 0, 12)
         RightScroll.BackgroundTransparency = 1
         RightScroll.BorderSizePixel = 0
-        RightScroll.ScrollBarThickness = 2
+        RightScroll.ScrollBarThickness = 3
         RightScroll.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
-        RightScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        RightScroll.ScrollBarImageTransparency = 0
+        RightScroll.ClipsDescendants = true
         RightScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         RightScroll.ZIndex = 21
         RightScroll.Parent = TabPage
@@ -1880,6 +1911,21 @@ end
         RightLayout.SortOrder = Enum.SortOrder.LayoutOrder
         RightLayout.Padding = UDim.new(0, 12)
         RightLayout.Parent = RightScroll
+
+        RightLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            RightScroll.CanvasSize = UDim2.new(0, 0, 0, RightLayout.AbsoluteContentSize.Y + 24)
+        end)
+
+        local tabEntry = {
+            btn = TabBtn,
+            stroke = TabStroke,
+            accent = TabAccent,
+            title = TabTitle,
+            page = TabPage,
+            leftScroll = LeftScroll,
+            rightScroll = RightScroll
+        }
+        table.insert(tabsList, tabEntry)
 
         local function selectTab()
             for _, t in ipairs(tabsList) do
@@ -1891,6 +1937,7 @@ end
                 t.page.Visible = false
             end
 
+            activeTab = tabEntry
             TabBtn.BackgroundTransparency = 0
             TabStroke.Transparency = 0
             TabAccent.Visible = true
@@ -1903,15 +1950,6 @@ end
             object = TabBtn,
             onClick = selectTab
         })
-
-        local tabEntry = {
-            btn = TabBtn,
-            stroke = TabStroke,
-            accent = TabAccent,
-            title = TabTitle,
-            page = TabPage
-        }
-        table.insert(tabsList, tabEntry)
 
         if tabIndex == 1 then
             selectTab()
@@ -2004,12 +2042,37 @@ end
 
             local Column = {}
 
-            -- 1. Add Toggle (Classic square switch with Right-Click Always/Toggle/Hold modes)
-            function Column:AddToggle(toggleName, defaultState, callback)
-                callback = callback or function() end
+            -- 1. Add Toggle (Classic square switch with selective Keybind/Modes)
+            function Column:AddToggle(toggleName, defaultState, arg3, arg4)
+                local callback = nil
+                local hasKeybind = false
+                local defaultKey = nil
+                local initialMode = "toggle"
+
+                if type(arg3) == "function" then
+                    callback = arg3
+                    if type(arg4) == "boolean" then
+                        hasKeybind = arg4
+                    elseif type(arg4) == "table" then
+                        hasKeybind = true
+                        defaultKey = arg4.Key or arg4.DefaultKey
+                        initialMode = arg4.Mode or "toggle"
+                    end
+                elseif type(arg3) == "table" then
+                    hasKeybind = arg3.Keybind ~= false
+                    defaultKey = arg3.Key or arg3.DefaultKey
+                    initialMode = arg3.Mode or "toggle"
+                    callback = arg4 or function() end
+                elseif type(arg3) == "boolean" then
+                    hasKeybind = arg3
+                    callback = arg4 or function() end
+                else
+                    callback = function() end
+                end
+
                 local state = defaultState == true
-                local mode = "toggle" -- "always", "toggle", or "hold"
-                local boundKey = nil
+                local mode = initialMode
+                local boundKey = defaultKey
                 local toggleId = "toggle_" .. toggleName:gsub("%s+", "_"):lower()
 
                 local Row = Instance.new("Frame")
@@ -2062,6 +2125,7 @@ end
                 Knob.Parent = Switch
 
                 local function updateKeybindDisplay()
+                    if not hasKeybind then return end
                     if mode == "always" then
                         Window:SetKeybind(toggleId, toggleName, "always", true)
                     elseif boundKey ~= nil then
@@ -2084,7 +2148,7 @@ end
                 table.insert(clickableRegistry, {
                     object = Row,
                     onClick = function()
-                        if mode == "always" then
+                        if hasKeybind and mode == "always" then
                             setToggle(true)
                         else
                             setToggle(not state)
@@ -2092,40 +2156,73 @@ end
                     end
                 })
 
-                table.insert(rightClickRegistry, {
-                    object = Row,
-                    name = toggleName,
-                    getMode = function() return mode end,
-                    setMode = function(newMode)
-                        mode = newMode
-                        if mode == "always" then
-                            setToggle(true)
+                local function registerRightClick()
+                    table.insert(rightClickRegistry, {
+                        object = Row,
+                        name = toggleName,
+                        getMode = function() return mode end,
+                        setMode = function(newMode)
+                            mode = newMode
+                            if mode == "always" then
+                                setToggle(true)
+                            end
+                            updateKeybindDisplay()
+                        end,
+                        getKey = function() return boundKey end,
+                        setKey = function(newKey)
+                            boundKey = newKey
+                            updateKeybindDisplay()
+                        end,
+                        toggle = function()
+                            if mode == "toggle" then
+                                setToggle(not state)
+                            end
+                        end,
+                        set = function(val)
+                            if mode ~= "always" then
+                                setToggle(val)
+                            end
                         end
-                        updateKeybindDisplay()
-                    end,
-                    getKey = function() return boundKey end,
-                    setKey = function(newKey)
-                        boundKey = newKey
-                        updateKeybindDisplay()
-                    end,
-                    toggle = function()
-                        if mode == "toggle" then
-                            setToggle(not state)
-                        end
-                    end,
-                    set = function(val)
-                        if mode ~= "always" then
-                            setToggle(val)
-                        end
-                    end
-                })
+                    })
+                end
 
-                return {
+                if hasKeybind then
+                    registerRightClick()
+                    updateKeybindDisplay()
+                end
+
+                local toggleObj = {
                     Set = function(self, val) setToggle(val) end,
                     Get = function(self) return state end,
-                    SetKey = function(self, k) boundKey = k; updateKeybindDisplay() end,
-                    SetMode = function(self, m) mode = m; if m == "always" then setToggle(true) else updateKeybindDisplay() end end
+                    AddKeybind = function(self, k, m)
+                        if not hasKeybind then
+                            hasKeybind = true
+                            if k then boundKey = k end
+                            if m then mode = m end
+                            registerRightClick()
+                            updateKeybindDisplay()
+                        end
+                        return self
+                    end,
+                    SetKey = function(self, k)
+                        if not hasKeybind then
+                            self:AddKeybind(k)
+                        else
+                            boundKey = k
+                            updateKeybindDisplay()
+                        end
+                    end,
+                    SetMode = function(self, m)
+                        if not hasKeybind then
+                            self:AddKeybind(nil, m)
+                        else
+                            mode = m
+                            if m == "always" then setToggle(true) else updateKeybindDisplay() end
+                        end
+                    end
                 }
+
+                return toggleObj
             end
 
             -- 2. Add Button (Classic sharp button)
