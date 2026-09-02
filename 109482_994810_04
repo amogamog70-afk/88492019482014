@@ -348,6 +348,10 @@ KBListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 KBListLayout.Padding = UDim.new(0, 4)
 KBListLayout.Parent = KBListContainer
 
+-- Interactive Zero-GPE Component Registries (Declared early for keybind entries)
+local clickableRegistry = {}
+local sliderRegistry = {}
+local rightClickRegistry = {}
 local keybindItems = {}
 
 local function updateKeybindsLayout()
@@ -1250,10 +1254,7 @@ local function isInside(x, y, obj)
        and y >= pos.Y and y <= (pos.Y + size.Y)
 end
 
--- Interactive Zero-GPE Component Registries
-local clickableRegistry = {}
-local sliderRegistry = {}
-local rightClickRegistry = {}
+-- Interactive Zero-GPE Component Variables
 local activeSlider = nil
 local activeContextItem = nil
 local isListeningKeybind = false
@@ -1531,11 +1532,13 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     elseif not gameProcessed then
         if isListeningKeybind and activeContextItem then
             if input.UserInputType == Enum.UserInputType.Keyboard then
-                if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.Backspace then
-                    activeContextItem.setKey(nil)
-                elseif input.KeyCode ~= Enum.KeyCode.Unknown then
-                    activeContextItem.setKey(input.KeyCode)
-                end
+                pcall(function()
+                    if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.Backspace then
+                        activeContextItem.setKey(nil)
+                    elseif input.KeyCode ~= Enum.KeyCode.Unknown then
+                        activeContextItem.setKey(input.KeyCode)
+                    end
+                end)
                 isListeningKeybind = false
                 updateContextMenuUI()
                 return
