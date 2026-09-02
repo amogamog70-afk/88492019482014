@@ -1991,6 +1991,10 @@ end
             RightScroll.CanvasSize = UDim2.new(0, 0, 0, RightLayout.AbsoluteContentSize.Y + 24)
         end)
 
+        local subtabsList = {}
+        local subtabsBar = nil
+        local activeSubTab = nil
+
         local tabEntry = {
             btn = TabBtn,
             stroke = TabStroke,
@@ -1999,7 +2003,8 @@ end
             icon = TabIcon,
             page = TabPage,
             leftScroll = LeftScroll,
-            rightScroll = RightScroll
+            rightScroll = RightScroll,
+            subtabsList = subtabsList
         }
         table.insert(tabsList, tabEntry)
 
@@ -2017,6 +2022,14 @@ end
             end
 
             activeTab = tabEntry
+            if #subtabsList > 0 and activeSubTab then
+                tabEntry.leftScroll = activeSubTab.leftScroll
+                tabEntry.rightScroll = activeSubTab.rightScroll
+            else
+                tabEntry.leftScroll = LeftScroll
+                tabEntry.rightScroll = RightScroll
+            end
+
             TabBtn.BackgroundTransparency = 0
             TabStroke.Transparency = 0
             TabAccent.Visible = true
@@ -2040,14 +2053,32 @@ end
         local Tab = {}
         local colCount = 0
 
-        -- Create Column / Section inside this Tab
-        function Tab:CreateColumn(colTitle, side)
-            colCount += 1
-            local targetScroll = LeftScroll
-            if side == "right" or (side == nil and colCount % 2 == 0) then
-                targetScroll = RightScroll
-            end
+        local function getOrCreateSubtabsBar()
+            if not subtabsBar then
+                subtabsBar = Instance.new("Frame")
+                subtabsBar.Name = "SubtabsBar"
+                subtabsBar.Active = false
+                subtabsBar.Size = UDim2.new(1, -28, 0, 28)
+                subtabsBar.Position = UDim2.new(0, 14, 0, 10)
+                subtabsBar.BackgroundTransparency = 1
+                subtabsBar.ZIndex = 25
+                subtabsBar.Parent = TabPage
 
+                local subLayout = Instance.new("UIListLayout")
+                subLayout.FillDirection = Enum.FillDirection.Horizontal
+                subLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                subLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+                subLayout.Padding = UDim.new(0, 8)
+                subLayout.Parent = subtabsBar
+
+                -- Hide default main page scroll frames when subtabs are present
+                LeftScroll.Visible = false
+                RightScroll.Visible = false
+            end
+            return subtabsBar
+        end
+
+        local function createColumnInternal(targetScroll, colTitle)
             local ColCard = Instance.new("Frame")
             ColCard.Name = "Col_" .. colTitle
             ColCard.Active = false
@@ -2577,6 +2608,186 @@ end
             end
 
             return Column
+        end
+
+        function Tab:CreateColumn(colTitle, side)
+            colCount += 1
+            local targetScroll = LeftScroll
+            if side == "right" or (side == nil and colCount % 2 == 0) then
+                targetScroll = RightScroll
+            end
+            return createColumnInternal(targetScroll, colTitle)
+        end
+
+        function Tab:CreateSubTab(subTabName)
+            local bar = getOrCreateSubtabsBar()
+            local subIndex = #subtabsList + 1
+
+            -- SubTab Button (Top bar segmented button)
+            local SubBtn = Instance.new("Frame")
+            SubBtn.Name = "SubBtn_" .. subTabName
+            SubBtn.Active = false
+            SubBtn.Size = UDim2.new(0, 0, 0, 26)
+            SubBtn.AutomaticSize = Enum.AutomaticSize.X
+            SubBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+            SubBtn.BorderSizePixel = 0
+            SubBtn.ZIndex = 26
+            SubBtn.Parent = bar
+
+            local SubBtnStroke = Instance.new("UIStroke")
+            SubBtnStroke.Thickness = 1
+            SubBtnStroke.Color = Color3.fromRGB(40, 44, 54)
+            SubBtnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            SubBtnStroke.Parent = SubBtn
+
+            local SubBtnPadding = Instance.new("UIPadding")
+            SubBtnPadding.PaddingLeft = UDim.new(0, 14)
+            SubBtnPadding.PaddingRight = UDim.new(0, 14)
+            SubBtnPadding.Parent = SubBtn
+
+            local SubBtnText = Instance.new("TextLabel")
+            SubBtnText.Name = "Text"
+            SubBtnText.Active = false
+            SubBtnText.Size = UDim2.new(1, 0, 1, 0)
+            SubBtnText.BackgroundTransparency = 1
+            SubBtnText.Font = Enum.Font.GothamMedium
+            SubBtnText.Text = subTabName
+            SubBtnText.TextSize = 11
+            SubBtnText.TextColor3 = Color3.fromRGB(140, 145, 160)
+            SubBtnText.TextXAlignment = Enum.TextXAlignment.Center
+            SubBtnText.TextYAlignment = Enum.TextYAlignment.Center
+            SubBtnText.ZIndex = 27
+            SubBtnText.Parent = SubBtn
+
+            local SubBtnAccent = Instance.new("Frame")
+            SubBtnAccent.Name = "Accent"
+            SubBtnAccent.Active = false
+            SubBtnAccent.Size = UDim2.new(1, 0, 0, 2)
+            SubBtnAccent.Position = UDim2.new(0, 0, 1, -2)
+            SubBtnAccent.BackgroundColor3 = Color3.fromRGB(230, 57, 70)
+            SubBtnAccent.BorderSizePixel = 0
+            SubBtnAccent.Visible = false
+            SubBtnAccent.ZIndex = 28
+            SubBtnAccent.Parent = SubBtn
+
+            -- Dedicated SubTab Page
+            local SubPage = Instance.new("Frame")
+            SubPage.Name = "SubPage_" .. subTabName
+            SubPage.Active = false
+            SubPage.Size = UDim2.new(1, 0, 1, -44)
+            SubPage.Position = UDim2.new(0, 0, 0, 44)
+            SubPage.BackgroundTransparency = 1
+            SubPage.ClipsDescendants = true
+            SubPage.Visible = false
+            SubPage.ZIndex = 21
+            SubPage.Parent = TabPage
+
+            local SubLeftScroll = Instance.new("ScrollingFrame")
+            SubLeftScroll.Name = "SubLeftScroll"
+            SubLeftScroll.Active = false
+            SubLeftScroll.Size = UDim2.new(0, 326, 1, -10)
+            SubLeftScroll.Position = UDim2.new(0, 14, 0, 5)
+            SubLeftScroll.BackgroundTransparency = 1
+            SubLeftScroll.BorderSizePixel = 0
+            SubLeftScroll.ScrollBarThickness = 3
+            SubLeftScroll.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
+            SubLeftScroll.ScrollBarImageTransparency = 0
+            SubLeftScroll.ClipsDescendants = true
+            SubLeftScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+            SubLeftScroll.ZIndex = 21
+            SubLeftScroll.Parent = SubPage
+
+            local SubLeftLayout = Instance.new("UIListLayout")
+            SubLeftLayout.FillDirection = Enum.FillDirection.Vertical
+            SubLeftLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            SubLeftLayout.Padding = UDim.new(0, 12)
+            SubLeftLayout.Parent = SubLeftScroll
+
+            SubLeftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                SubLeftScroll.CanvasSize = UDim2.new(0, 0, 0, SubLeftLayout.AbsoluteContentSize.Y + 24)
+            end)
+
+            local SubRightScroll = Instance.new("ScrollingFrame")
+            SubRightScroll.Name = "SubRightScroll"
+            SubRightScroll.Active = false
+            SubRightScroll.Size = UDim2.new(0, 326, 1, -10)
+            SubRightScroll.Position = UDim2.new(0, 350, 0, 5)
+            SubRightScroll.BackgroundTransparency = 1
+            SubRightScroll.BorderSizePixel = 0
+            SubRightScroll.ScrollBarThickness = 3
+            SubRightScroll.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
+            SubRightScroll.ScrollBarImageTransparency = 0
+            SubRightScroll.ClipsDescendants = true
+            SubRightScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+            SubRightScroll.ZIndex = 21
+            SubRightScroll.Parent = SubPage
+
+            local SubRightLayout = Instance.new("UIListLayout")
+            SubRightLayout.FillDirection = Enum.FillDirection.Vertical
+            SubRightLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            SubRightLayout.Padding = UDim.new(0, 12)
+            SubRightLayout.Parent = SubRightScroll
+
+            SubRightLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                SubRightScroll.CanvasSize = UDim2.new(0, 0, 0, SubRightLayout.AbsoluteContentSize.Y + 24)
+            end)
+
+            local subEntry = {
+                btn = SubBtn,
+                stroke = SubBtnStroke,
+                text = SubBtnText,
+                accent = SubBtnAccent,
+                page = SubPage,
+                leftScroll = SubLeftScroll,
+                rightScroll = SubRightScroll
+            }
+            table.insert(subtabsList, subEntry)
+
+            local function selectSubTab()
+                for _, s in ipairs(subtabsList) do
+                    s.btn.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+                    s.stroke.Color = Color3.fromRGB(40, 44, 54)
+                    s.text.TextColor3 = Color3.fromRGB(140, 145, 160)
+                    s.text.Font = Enum.Font.GothamMedium
+                    s.accent.Visible = false
+                    s.page.Visible = false
+                end
+
+                activeSubTab = subEntry
+                SubBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
+                SubBtnStroke.Color = Color3.fromRGB(230, 57, 70)
+                SubBtnText.TextColor3 = Color3.fromRGB(245, 245, 250)
+                SubBtnText.Font = Enum.Font.GothamBold
+                SubBtnAccent.Visible = true
+                SubPage.Visible = true
+
+                -- Route wheel scrolling to active subtab
+                tabEntry.leftScroll = SubLeftScroll
+                tabEntry.rightScroll = SubRightScroll
+            end
+
+            table.insert(clickableRegistry, {
+                object = SubBtn,
+                onClick = selectSubTab
+            })
+
+            if subIndex == 1 then
+                selectSubTab()
+            end
+
+            local SubTab = {}
+            local subColCount = 0
+
+            function SubTab:CreateColumn(colTitle, side)
+                subColCount += 1
+                local target = SubLeftScroll
+                if side == "right" or (side == nil and subColCount % 2 == 0) then
+                    target = SubRightScroll
+                end
+                return createColumnInternal(target, colTitle)
+            end
+
+            return SubTab
         end
 
         return Tab
