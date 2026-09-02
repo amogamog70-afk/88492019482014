@@ -408,6 +408,18 @@ local function removeKeybindEntry(id)
     end
 end
 
+-- Dynamic Viewport Screen Size Helper
+local function getViewportSize()
+    local cam = workspace.CurrentCamera
+    if cam and cam.ViewportSize.X > 0 and cam.ViewportSize.Y > 0 then
+        return cam.ViewportSize
+    end
+    if ScreenGui and ScreenGui.AbsoluteSize.X > 0 then
+        return ScreenGui.AbsoluteSize
+    end
+    return Vector2.new(1920, 1080)
+end
+
 -- Initial screen centering in pure integer pixels (0 fractional subpixel blur)
 local vp = getViewportSize()
 local initialX = math.round((vp.X - 880) / 2)
@@ -863,17 +875,6 @@ KeybindBadgeText.Parent = KeybindBadge
 -- Dynamic Viewport Screen Clamping & Smooth Dragging
 -- (Prevents GUI elements from being dragged off-screen on ANY monitor size)
 ----------------------------------------------------------------------
-local function getViewportSize()
-    local cam = workspace.CurrentCamera
-    if cam and cam.ViewportSize.X > 0 and cam.ViewportSize.Y > 0 then
-        return cam.ViewportSize
-    end
-    if ScreenGui and ScreenGui.AbsoluteSize.X > 0 then
-        return ScreenGui.AbsoluteSize
-    end
-    return Vector2.new(1920, 1080)
-end
-
 -- Clamp MainFrame (880x530) within screen boundaries (Pure pixel coordinates)
 local function clampMainFrameOffset(offset)
     local vp = getViewportSize()
