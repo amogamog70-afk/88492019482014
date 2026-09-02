@@ -1801,14 +1801,34 @@ end
         removeKeybindEntry(id)
     end
 
+    -- Default Tab Icons Mapping (Mapped by user-provided asset IDs)
+    local defaultTabIcons = {
+        ["aim"] = "125143421594685",
+        ["combat"] = "125143421594685",
+        ["worold"] = "96232528933854",
+        ["world"] = "96232528933854",
+        ["esp"] = "125516540541120",
+        ["player"] = "84681188457139",
+        ["movement"] = "140301041058153",
+        ["move"] = "140301041058153",
+        ["visuals"] = "84681188457139",
+        ["chams"] = "84681188457139",
+        ["auto"] = "12690726311",
+        ["misc"] = "8622237899",
+        ["miscellaneous"] = "8622237899"
+    }
+
     -- Tabs and Pages Controller
     local tabsList = {}
     local tabCount = 0
     local activeTab = nil
 
-    function Window:CreateTab(tabName)
+    function Window:CreateTab(tabName, customIcon)
         tabCount += 1
         local tabIndex = tabCount
+
+        local resolvedIcon = customIcon or defaultTabIcons[string.lower(tostring(tabName))]
+        local iconAsset = resolvedIcon and ("rbxassetid://" .. tostring(resolvedIcon):gsub("%D", "")) or nil
 
         -- 1. Tab Button in Sidebar
         local TabBtn = Instance.new("Frame")
@@ -1839,11 +1859,25 @@ end
         TabAccent.ZIndex = 41
         TabAccent.Parent = TabBtn
 
+        local TabIcon = nil
+        if iconAsset then
+            TabIcon = Instance.new("ImageLabel")
+            TabIcon.Name = "TabIcon"
+            TabIcon.Active = false
+            TabIcon.Size = UDim2.new(0, 16, 0, 16)
+            TabIcon.Position = UDim2.new(0, 12, 0.5, -8)
+            TabIcon.BackgroundTransparency = 1
+            TabIcon.Image = iconAsset
+            TabIcon.ImageColor3 = Color3.fromRGB(130, 135, 150)
+            TabIcon.ZIndex = 41
+            TabIcon.Parent = TabBtn
+        end
+
         local TabTitle = Instance.new("TextLabel")
         TabTitle.Name = "TabTitle"
         TabTitle.Active = false
-        TabTitle.Size = UDim2.new(1, -20, 1, 0)
-        TabTitle.Position = UDim2.new(0, 14, 0, 0)
+        TabTitle.Size = iconAsset and UDim2.new(1, -38, 1, 0) or UDim2.new(1, -20, 1, 0)
+        TabTitle.Position = iconAsset and UDim2.new(0, 34, 0, 0) or UDim2.new(0, 14, 0, 0)
         TabTitle.BackgroundTransparency = 1
         TabTitle.Font = Enum.Font.GothamMedium
         TabTitle.Text = tabName
@@ -1921,6 +1955,7 @@ end
             stroke = TabStroke,
             accent = TabAccent,
             title = TabTitle,
+            icon = TabIcon,
             page = TabPage,
             leftScroll = LeftScroll,
             rightScroll = RightScroll
@@ -1934,6 +1969,9 @@ end
                 t.accent.Visible = false
                 t.title.TextColor3 = Color3.fromRGB(130, 135, 150)
                 t.title.Font = Enum.Font.GothamMedium
+                if t.icon then
+                    t.icon.ImageColor3 = Color3.fromRGB(130, 135, 150)
+                end
                 t.page.Visible = false
             end
 
@@ -1943,6 +1981,9 @@ end
             TabAccent.Visible = true
             TabTitle.TextColor3 = Color3.fromRGB(245, 245, 250)
             TabTitle.Font = Enum.Font.GothamBold
+            if TabIcon then
+                TabIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
+            end
             TabPage.Visible = true
         end
 
