@@ -2058,17 +2058,35 @@ end
                 subtabsBar = Instance.new("Frame")
                 subtabsBar.Name = "SubtabsBar"
                 subtabsBar.Active = false
-                subtabsBar.Size = UDim2.new(1, -28, 0, 28)
-                subtabsBar.Position = UDim2.new(0, 14, 0, 10)
-                subtabsBar.BackgroundTransparency = 1
+                subtabsBar.Size = UDim2.new(1, -28, 0, 32)
+                subtabsBar.Position = UDim2.new(0, 14, 0, 8)
+                subtabsBar.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+                subtabsBar.BorderSizePixel = 0
                 subtabsBar.ZIndex = 25
                 subtabsBar.Parent = TabPage
+
+                local subBarCorner = Instance.new("UICorner")
+                subBarCorner.CornerRadius = UDim.new(0, 4)
+                subBarCorner.Parent = subtabsBar
+
+                local subBarStroke = Instance.new("UIStroke")
+                subBarStroke.Thickness = 1
+                subBarStroke.Color = Color3.fromRGB(34, 36, 44)
+                subBarStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                subBarStroke.Parent = subtabsBar
+
+                local subBarPadding = Instance.new("UIPadding")
+                subBarPadding.PaddingLeft = UDim.new(0, 4)
+                subBarPadding.PaddingRight = UDim.new(0, 4)
+                subBarPadding.PaddingTop = UDim.new(0, 3)
+                subBarPadding.PaddingBottom = UDim.new(0, 3)
+                subBarPadding.Parent = subtabsBar
 
                 local subLayout = Instance.new("UIListLayout")
                 subLayout.FillDirection = Enum.FillDirection.Horizontal
                 subLayout.SortOrder = Enum.SortOrder.LayoutOrder
                 subLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-                subLayout.Padding = UDim.new(0, 8)
+                subLayout.Padding = UDim.new(0, 4)
                 subLayout.Parent = subtabsBar
 
                 -- Hide default main page scroll frames when subtabs are present
@@ -2619,41 +2637,81 @@ end
             return createColumnInternal(targetScroll, colTitle)
         end
 
-        function Tab:CreateSubTab(subTabName)
+        function Tab:CreateSubTab(subTabName, customIcon)
             local bar = getOrCreateSubtabsBar()
             local subIndex = #subtabsList + 1
 
-            -- SubTab Button (Top bar segmented button)
+            -- Resolve subtab icon (custom passed, or automatic lookup by name, or false to disable)
+            local resolvedSubIcon = nil
+            if customIcon ~= false then
+                if type(customIcon) == "string" or type(customIcon) == "number" then
+                    resolvedSubIcon = "rbxassetid://" .. tostring(customIcon):gsub("%D", "")
+                else
+                    local lookup = defaultTabIcons[string.lower(tostring(subTabName))]
+                    if lookup then
+                        resolvedSubIcon = "rbxassetid://" .. tostring(lookup):gsub("%D", "")
+                    end
+                end
+            end
+
+            -- SubTab Button (Segmented pill button inside top bar)
             local SubBtn = Instance.new("Frame")
             SubBtn.Name = "SubBtn_" .. subTabName
             SubBtn.Active = false
-            SubBtn.Size = UDim2.new(0, 0, 0, 26)
+            SubBtn.Size = UDim2.new(0, 0, 1, 0)
             SubBtn.AutomaticSize = Enum.AutomaticSize.X
-            SubBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+            SubBtn.BackgroundColor3 = Color3.fromRGB(28, 30, 38)
+            SubBtn.BackgroundTransparency = 1
             SubBtn.BorderSizePixel = 0
             SubBtn.ZIndex = 26
             SubBtn.Parent = bar
 
+            local SubBtnCorner = Instance.new("UICorner")
+            SubBtnCorner.CornerRadius = UDim.new(0, 4)
+            SubBtnCorner.Parent = SubBtn
+
             local SubBtnStroke = Instance.new("UIStroke")
             SubBtnStroke.Thickness = 1
-            SubBtnStroke.Color = Color3.fromRGB(40, 44, 54)
+            SubBtnStroke.Color = Color3.fromRGB(48, 52, 66)
             SubBtnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            SubBtnStroke.Transparency = 1
             SubBtnStroke.Parent = SubBtn
 
+            local SubBtnLayout = Instance.new("UIListLayout")
+            SubBtnLayout.FillDirection = Enum.FillDirection.Horizontal
+            SubBtnLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            SubBtnLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+            SubBtnLayout.Padding = UDim.new(0, 6)
+            SubBtnLayout.Parent = SubBtn
+
             local SubBtnPadding = Instance.new("UIPadding")
-            SubBtnPadding.PaddingLeft = UDim.new(0, 14)
-            SubBtnPadding.PaddingRight = UDim.new(0, 14)
+            SubBtnPadding.PaddingLeft = UDim.new(0, 12)
+            SubBtnPadding.PaddingRight = UDim.new(0, 12)
             SubBtnPadding.Parent = SubBtn
+
+            local SubIcon = nil
+            if resolvedSubIcon then
+                SubIcon = Instance.new("ImageLabel")
+                SubIcon.Name = "SubIcon"
+                SubIcon.Active = false
+                SubIcon.Size = UDim2.new(0, 14, 0, 14)
+                SubIcon.BackgroundTransparency = 1
+                SubIcon.Image = resolvedSubIcon
+                SubIcon.ImageColor3 = Color3.fromRGB(130, 135, 150)
+                SubIcon.ZIndex = 27
+                SubIcon.Parent = SubBtn
+            end
 
             local SubBtnText = Instance.new("TextLabel")
             SubBtnText.Name = "Text"
             SubBtnText.Active = false
-            SubBtnText.Size = UDim2.new(1, 0, 1, 0)
+            SubBtnText.Size = UDim2.new(0, 0, 1, 0)
+            SubBtnText.AutomaticSize = Enum.AutomaticSize.X
             SubBtnText.BackgroundTransparency = 1
             SubBtnText.Font = Enum.Font.GothamMedium
             SubBtnText.Text = subTabName
             SubBtnText.TextSize = 11
-            SubBtnText.TextColor3 = Color3.fromRGB(140, 145, 160)
+            SubBtnText.TextColor3 = Color3.fromRGB(130, 135, 150)
             SubBtnText.TextXAlignment = Enum.TextXAlignment.Center
             SubBtnText.TextYAlignment = Enum.TextYAlignment.Center
             SubBtnText.ZIndex = 27
@@ -2662,20 +2720,24 @@ end
             local SubBtnAccent = Instance.new("Frame")
             SubBtnAccent.Name = "Accent"
             SubBtnAccent.Active = false
-            SubBtnAccent.Size = UDim2.new(1, 0, 0, 2)
-            SubBtnAccent.Position = UDim2.new(0, 0, 1, -2)
+            SubBtnAccent.Size = UDim2.new(0, 14, 0, 2)
+            SubBtnAccent.Position = UDim2.new(0.5, -7, 1, -2)
             SubBtnAccent.BackgroundColor3 = Color3.fromRGB(230, 57, 70)
             SubBtnAccent.BorderSizePixel = 0
             SubBtnAccent.Visible = false
             SubBtnAccent.ZIndex = 28
             SubBtnAccent.Parent = SubBtn
 
+            local SubAccentCorner = Instance.new("UICorner")
+            SubAccentCorner.CornerRadius = UDim.new(0, 1)
+            SubAccentCorner.Parent = SubBtnAccent
+
             -- Dedicated SubTab Page
             local SubPage = Instance.new("Frame")
             SubPage.Name = "SubPage_" .. subTabName
             SubPage.Active = false
-            SubPage.Size = UDim2.new(1, 0, 1, -44)
-            SubPage.Position = UDim2.new(0, 0, 0, 44)
+            SubPage.Size = UDim2.new(1, 0, 1, -48)
+            SubPage.Position = UDim2.new(0, 0, 0, 46)
             SubPage.BackgroundTransparency = 1
             SubPage.ClipsDescendants = true
             SubPage.Visible = false
@@ -2736,6 +2798,7 @@ end
                 btn = SubBtn,
                 stroke = SubBtnStroke,
                 text = SubBtnText,
+                icon = SubIcon,
                 accent = SubBtnAccent,
                 page = SubPage,
                 leftScroll = SubLeftScroll,
@@ -2745,19 +2808,27 @@ end
 
             local function selectSubTab()
                 for _, s in ipairs(subtabsList) do
-                    s.btn.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
-                    s.stroke.Color = Color3.fromRGB(40, 44, 54)
-                    s.text.TextColor3 = Color3.fromRGB(140, 145, 160)
+                    s.btn.BackgroundTransparency = 1
+                    s.stroke.Transparency = 1
+                    s.text.TextColor3 = Color3.fromRGB(130, 135, 150)
                     s.text.Font = Enum.Font.GothamMedium
+                    if s.icon then
+                        s.icon.ImageColor3 = Color3.fromRGB(130, 135, 150)
+                    end
                     s.accent.Visible = false
                     s.page.Visible = false
                 end
 
                 activeSubTab = subEntry
-                SubBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
-                SubBtnStroke.Color = Color3.fromRGB(230, 57, 70)
+                SubBtn.BackgroundTransparency = 0
+                SubBtn.BackgroundColor3 = Color3.fromRGB(28, 30, 38)
+                SubBtnStroke.Transparency = 0
+                SubBtnStroke.Color = Color3.fromRGB(48, 52, 66)
                 SubBtnText.TextColor3 = Color3.fromRGB(245, 245, 250)
                 SubBtnText.Font = Enum.Font.GothamBold
+                if SubIcon then
+                    SubIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
+                end
                 SubBtnAccent.Visible = true
                 SubPage.Visible = true
 
