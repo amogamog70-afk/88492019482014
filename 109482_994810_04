@@ -263,7 +263,7 @@ KeybindsFrame.Name = "DeadHub_Keybinds"
 KeybindsFrame.Active = false
 KeybindsFrame.Visible = true
 KeybindsFrame.Position = UDim2.new(0, 10, 0, 62) -- Sits cleanly below Watermark on the left
-KeybindsFrame.Size = UDim2.new(0, 150, 0, 0)
+KeybindsFrame.Size = UDim2.new(0, 175, 0, 0)
 KeybindsFrame.AutomaticSize = Enum.AutomaticSize.Y
 KeybindsFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
 KeybindsFrame.BorderSizePixel = 0
@@ -356,7 +356,7 @@ local function updateKeybindsLayout()
     KBListContainer.Visible = hasItems
 end
 
-local function addKeybindEntry(id, name, mode, isActive)
+local function addKeybindEntry(id, name, mode, isActive, keyName)
     local row = Instance.new("Frame")
     row.Name = "KBRow_" .. id
     row.Active = false
@@ -368,7 +368,7 @@ local function addKeybindEntry(id, name, mode, isActive)
     local nameLbl = Instance.new("TextLabel")
     nameLbl.Name = "NameLbl"
     nameLbl.Active = false
-    nameLbl.Size = UDim2.new(1, -50, 1, 0)
+    nameLbl.Size = UDim2.new(1, -78, 1, 0)
     nameLbl.Position = UDim2.new(0, 0, 0, 0)
     nameLbl.BackgroundTransparency = 1
     nameLbl.Font = Enum.Font.GothamMedium
@@ -377,17 +377,26 @@ local function addKeybindEntry(id, name, mode, isActive)
     nameLbl.TextColor3 = Color3.fromRGB(200, 205, 218)
     nameLbl.TextXAlignment = Enum.TextXAlignment.Left
     nameLbl.TextYAlignment = Enum.TextYAlignment.Center
+    nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
     nameLbl.ZIndex = 103
     nameLbl.Parent = row
 
     local modeBadge = Instance.new("TextLabel")
     modeBadge.Name = "ModeBadge"
     modeBadge.Active = false
-    modeBadge.Size = UDim2.new(0, 48, 1, 0)
-    modeBadge.Position = UDim2.new(1, -48, 0, 0)
+    modeBadge.Size = UDim2.new(0, 75, 1, 0)
+    modeBadge.Position = UDim2.new(1, -75, 0, 0)
     modeBadge.BackgroundTransparency = 1
     modeBadge.Font = Enum.Font.GothamBold
-    modeBadge.Text = "[" .. mode .. "]"
+
+    local badgeText = ""
+    if keyName and keyName ~= "" and keyName ~= "None" then
+        badgeText = "[" .. keyName .. " | " .. string.lower(mode) .. "]"
+    else
+        badgeText = "[" .. string.lower(mode) .. "]"
+    end
+
+    modeBadge.Text = badgeText
     modeBadge.TextSize = 9
     modeBadge.TextColor3 = isActive and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(120, 125, 140)
     modeBadge.TextXAlignment = Enum.TextXAlignment.Right
@@ -395,7 +404,28 @@ local function addKeybindEntry(id, name, mode, isActive)
     modeBadge.ZIndex = 103
     modeBadge.Parent = row
 
-    keybindItems[id] = {frame = row, nameLbl = nameLbl, modeBadge = modeBadge}
+    local lastKbRowClick = 0
+    table.insert(clickableRegistry, {
+        object = row,
+        onClick = function()
+            local now = tick()
+            if (now - lastKbRowClick) < 0.35 then
+                -- Double-click on keybind widget row removes the keybind
+                lastKbRowClick = 0
+                for _, t in ipairs(rightClickRegistry) do
+                    if t.id == id and t.resetKeybind then
+                        t.resetKeybind()
+                        break
+                    end
+                end
+                removeKeybindEntry(id)
+                return
+            end
+            lastKbRowClick = now
+        end
+    })
+
+    keybindItems[id] = {frame = row, nameLbl = nameLbl, modeBadge = modeBadge, keyName = keyName}
     updateKeybindsLayout()
     return row
 end
@@ -1787,13 +1817,21 @@ end
         toggleKeybinds(state)
     end
 
-    function Window:SetKeybind(id, name, mode, isActive)
+    function Window:SetKeybind(id, name, mode, isActive, keyName)
+        local badgeText = ""
+        if keyName and keyName ~= "" and keyName ~= "None" then
+            badgeText = "[" .. keyName .. " | " .. string.lower(mode) .. "]"
+        else
+            badgeText = "[" .. string.lower(mode) .. "]"
+        end
+
         if not keybindItems[id] then
-            addKeybindEntry(id, name, mode, isActive)
+            addKeybindEntry(id, name, mode, isActive, keyName)
         else
             keybindItems[id].nameLbl.Text = name
-            keybindItems[id].modeBadge.Text = "[" .. mode .. "]"
+            keybindItems[id].modeBadge.Text = badgeText
             keybindItems[id].modeBadge.TextColor3 = isActive and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(120, 125, 140)
+            keybindItems[id].keyName = keyName
         end
     end
 
@@ -2167,12 +2205,23 @@ end
 
                 local function updateKeybindDisplay()
                     if not hasKeybind then return end
+                    local keyName = boundKey and boundKey.Name or nil
+
                     if mode == "always" then
-                        Window:SetKeybind(toggleId, toggleName, "always", true)
+                        Window:SetKeybind(toggleId, toggleName, "always", true, keyName)
                     elseif boundKey ~= nil then
-                        Window:SetKeybind(toggleId, toggleName, mode, state)
+                        Window:SetKeybind(toggleId, toggleName, mode, state, keyName)
                     else
                         Window:RemoveKeybind(toggleId)
+                    end
+                end
+
+                local function resetKeybind()
+                    boundKey = nil
+                    mode = "toggle"
+                    updateKeybindDisplay()
+                    if activeContextItem and activeContextItem.object == Row then
+                        updateContextMenuUI()
                     end
                 end
 
@@ -2186,9 +2235,19 @@ end
                     pcall(callback, state)
                 end
 
+                local lastRowClickTime = 0
                 table.insert(clickableRegistry, {
                     object = Row,
                     onClick = function()
+                        local now = tick()
+                        if hasKeybind and (now - lastRowClickTime) < 0.35 then
+                            -- Double click detected! Reset / remove keybind!
+                            lastRowClickTime = 0
+                            resetKeybind()
+                            return
+                        end
+                        lastRowClickTime = now
+
                         if hasKeybind and mode == "always" then
                             setToggle(true)
                         else
@@ -2199,8 +2258,10 @@ end
 
                 local function registerRightClick()
                     table.insert(rightClickRegistry, {
+                        id = toggleId,
                         object = Row,
                         name = toggleName,
+                        resetKeybind = resetKeybind,
                         getMode = function() return mode end,
                         setMode = function(newMode)
                             mode = newMode
