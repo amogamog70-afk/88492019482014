@@ -502,15 +502,14 @@ Subtitle.TextYAlignment = Enum.TextYAlignment.Center
 Subtitle.TextTruncate = Enum.TextTruncate.AtEnd
 Subtitle.Parent = Header
 
--- Right Header Section: System & Session Metadata Badges (Session Time & Memory Usage)
+-- Right Header Section: System & Session Metadata Badges (Time & Memory Usage)
 local HeaderStats = Instance.new("Frame")
 HeaderStats.Name = "HeaderStats"
 HeaderStats.Active = false
-HeaderStats.Size = UDim2.new(0, 0, 0, 24)
-HeaderStats.AutomaticSize = Enum.AutomaticSize.X
-HeaderStats.Position = UDim2.new(1, -18, 0.5, -12)
-HeaderStats.AnchorPoint = Vector2.new(1, 0)
+HeaderStats.Size = UDim2.new(0, 220, 0, 26)
+HeaderStats.Position = UDim2.new(1, -235, 0.5, -13)
 HeaderStats.BackgroundTransparency = 1
+HeaderStats.ZIndex = 50
 HeaderStats.Parent = Header
 
 local HeaderStatsLayout = Instance.new("UIListLayout")
@@ -521,15 +520,15 @@ HeaderStatsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 HeaderStatsLayout.Padding = UDim.new(0, 8)
 HeaderStatsLayout.Parent = HeaderStats
 
--- 1. Session Duration Badge
+-- 1. Session Duration Badge with user icon (6846329320)
 local SessionBadge = Instance.new("Frame")
 SessionBadge.Name = "SessionBadge"
 SessionBadge.Active = false
-SessionBadge.Size = UDim2.new(0, 0, 0, 24)
-SessionBadge.AutomaticSize = Enum.AutomaticSize.X
+SessionBadge.Size = UDim2.new(0, 105, 0, 26)
 SessionBadge.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
 SessionBadge.BorderSizePixel = 0
 SessionBadge.LayoutOrder = 1
+SessionBadge.ZIndex = 51
 SessionBadge.Parent = HeaderStats
 
 local SessionBadgeStroke = Instance.new("UIStroke")
@@ -538,54 +537,41 @@ SessionBadgeStroke.Color = Color3.fromRGB(38, 40, 48)
 SessionBadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 SessionBadgeStroke.Parent = SessionBadge
 
-local SessionBadgePadding = Instance.new("UIPadding")
-SessionBadgePadding.PaddingLeft = UDim.new(0, 9)
-SessionBadgePadding.PaddingRight = UDim.new(0, 9)
-SessionBadgePadding.Parent = SessionBadge
-
-local SessionBadgeLayout = Instance.new("UIListLayout")
-SessionBadgeLayout.FillDirection = Enum.FillDirection.Horizontal
-SessionBadgeLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-SessionBadgeLayout.Padding = UDim.new(0, 6)
-SessionBadgeLayout.Parent = SessionBadge
-
-local SessionTag = Instance.new("TextLabel")
-SessionTag.Name = "SessionTag"
-SessionTag.Active = false
-SessionTag.Size = UDim2.new(0, 0, 1, 0)
-SessionTag.AutomaticSize = Enum.AutomaticSize.X
-SessionTag.BackgroundTransparency = 1
-SessionTag.Font = Enum.Font.GothamBold
-SessionTag.Text = "SESSION"
-SessionTag.TextSize = 9
-SessionTag.TextColor3 = Color3.fromRGB(230, 57, 70)
-SessionTag.TextXAlignment = Enum.TextXAlignment.Left
-SessionTag.TextYAlignment = Enum.TextYAlignment.Center
-SessionTag.Parent = SessionBadge
+local SessionIcon = Instance.new("ImageLabel")
+SessionIcon.Name = "SessionIcon"
+SessionIcon.Active = false
+SessionIcon.Size = UDim2.new(0, 14, 0, 14)
+SessionIcon.Position = UDim2.new(0, 8, 0.5, -7)
+SessionIcon.BackgroundTransparency = 1
+SessionIcon.Image = "rbxassetid://6846329320"
+SessionIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
+SessionIcon.ZIndex = 52
+SessionIcon.Parent = SessionBadge
 
 local SessionVal = Instance.new("TextLabel")
 SessionVal.Name = "SessionVal"
 SessionVal.Active = false
-SessionVal.Size = UDim2.new(0, 0, 1, 0)
-SessionVal.AutomaticSize = Enum.AutomaticSize.X
+SessionVal.Size = UDim2.new(1, -26, 1, 0)
+SessionVal.Position = UDim2.new(0, 24, 0, 0)
 SessionVal.BackgroundTransparency = 1
 SessionVal.Font = Enum.Font.GothamBold
 SessionVal.Text = "00:00:00"
 SessionVal.TextSize = 10
 SessionVal.TextColor3 = Color3.fromRGB(225, 230, 240)
-SessionVal.TextXAlignment = Enum.TextXAlignment.Left
+SessionVal.TextXAlignment = Enum.TextXAlignment.Center
 SessionVal.TextYAlignment = Enum.TextYAlignment.Center
+SessionVal.ZIndex = 52
 SessionVal.Parent = SessionBadge
 
--- 2. Memory Usage Badge
+-- 2. Memory Usage Badge with user icon (88995379969023)
 local MemBadge = Instance.new("Frame")
 MemBadge.Name = "MemBadge"
 MemBadge.Active = false
-MemBadge.Size = UDim2.new(0, 0, 0, 24)
-MemBadge.AutomaticSize = Enum.AutomaticSize.X
+MemBadge.Size = UDim2.new(0, 95, 0, 26)
 MemBadge.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
 MemBadge.BorderSizePixel = 0
 MemBadge.LayoutOrder = 2
+MemBadge.ZIndex = 51
 MemBadge.Parent = HeaderStats
 
 local MemBadgeStroke = Instance.new("UIStroke")
@@ -594,43 +580,30 @@ MemBadgeStroke.Color = Color3.fromRGB(38, 40, 48)
 MemBadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 MemBadgeStroke.Parent = MemBadge
 
-local MemBadgePadding = Instance.new("UIPadding")
-MemBadgePadding.PaddingLeft = UDim.new(0, 9)
-MemBadgePadding.PaddingRight = UDim.new(0, 9)
-MemBadgePadding.Parent = MemBadge
-
-local MemBadgeLayout = Instance.new("UIListLayout")
-MemBadgeLayout.FillDirection = Enum.FillDirection.Horizontal
-MemBadgeLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-MemBadgeLayout.Padding = UDim.new(0, 6)
-MemBadgeLayout.Parent = MemBadge
-
-local MemTag = Instance.new("TextLabel")
-MemTag.Name = "MemTag"
-MemTag.Active = false
-MemTag.Size = UDim2.new(0, 0, 1, 0)
-MemTag.AutomaticSize = Enum.AutomaticSize.X
-MemTag.BackgroundTransparency = 1
-MemTag.Font = Enum.Font.GothamBold
-MemTag.Text = "MEM"
-MemTag.TextSize = 9
-MemTag.TextColor3 = Color3.fromRGB(230, 57, 70)
-MemTag.TextXAlignment = Enum.TextXAlignment.Left
-MemTag.TextYAlignment = Enum.TextYAlignment.Center
-MemTag.Parent = MemBadge
+local MemIcon = Instance.new("ImageLabel")
+MemIcon.Name = "MemIcon"
+MemIcon.Active = false
+MemIcon.Size = UDim2.new(0, 14, 0, 14)
+MemIcon.Position = UDim2.new(0, 8, 0.5, -7)
+MemIcon.BackgroundTransparency = 1
+MemIcon.Image = "rbxassetid://88995379969023"
+MemIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
+MemIcon.ZIndex = 52
+MemIcon.Parent = MemBadge
 
 local MemVal = Instance.new("TextLabel")
 MemVal.Name = "MemVal"
 MemVal.Active = false
-MemVal.Size = UDim2.new(0, 0, 1, 0)
-MemVal.AutomaticSize = Enum.AutomaticSize.X
+MemVal.Size = UDim2.new(1, -26, 1, 0)
+MemVal.Position = UDim2.new(0, 24, 0, 0)
 MemVal.BackgroundTransparency = 1
 MemVal.Font = Enum.Font.GothamBold
 MemVal.Text = "0 MB"
 MemVal.TextSize = 10
 MemVal.TextColor3 = Color3.fromRGB(225, 230, 240)
-MemVal.TextXAlignment = Enum.TextXAlignment.Left
+MemVal.TextXAlignment = Enum.TextXAlignment.Center
 MemVal.TextYAlignment = Enum.TextYAlignment.Center
+MemVal.ZIndex = 52
 MemVal.Parent = MemBadge
 
 ----------------------------------------------------------------------
