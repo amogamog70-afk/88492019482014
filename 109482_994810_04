@@ -1968,4 +1968,8 @@ end
     return Window
 end
 
+if getgenv then
+    getgenv().DeadHub = DeadHub
+end
+
 return DeadHub
