@@ -2717,21 +2717,6 @@ end
             SubBtnText.ZIndex = 27
             SubBtnText.Parent = SubBtn
 
-            local SubBtnAccent = Instance.new("Frame")
-            SubBtnAccent.Name = "Accent"
-            SubBtnAccent.Active = false
-            SubBtnAccent.Size = UDim2.new(0, 14, 0, 2)
-            SubBtnAccent.Position = UDim2.new(0.5, -7, 1, -2)
-            SubBtnAccent.BackgroundColor3 = Color3.fromRGB(230, 57, 70)
-            SubBtnAccent.BorderSizePixel = 0
-            SubBtnAccent.Visible = false
-            SubBtnAccent.ZIndex = 28
-            SubBtnAccent.Parent = SubBtn
-
-            local SubAccentCorner = Instance.new("UICorner")
-            SubAccentCorner.CornerRadius = UDim.new(0, 1)
-            SubAccentCorner.Parent = SubBtnAccent
-
             -- Dedicated SubTab Page
             local SubPage = Instance.new("Frame")
             SubPage.Name = "SubPage_" .. subTabName
@@ -2799,7 +2784,6 @@ end
                 stroke = SubBtnStroke,
                 text = SubBtnText,
                 icon = SubIcon,
-                accent = SubBtnAccent,
                 page = SubPage,
                 leftScroll = SubLeftScroll,
                 rightScroll = SubRightScroll
@@ -2815,7 +2799,6 @@ end
                     if s.icon then
                         s.icon.ImageColor3 = Color3.fromRGB(130, 135, 150)
                     end
-                    s.accent.Visible = false
                     s.page.Visible = false
                 end
 
@@ -2829,7 +2812,6 @@ end
                 if SubIcon then
                     SubIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
                 end
-                SubBtnAccent.Visible = true
                 SubPage.Visible = true
 
                 -- Route wheel scrolling to active subtab
