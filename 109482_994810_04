@@ -2476,12 +2476,14 @@ end
                 Label.ZIndex = 25
                 Label.Parent = Row
 
-                -- Editable Value Box Frame (Click to type exact numbers)
+                -- Value Box Frame (Holds the editable number + permanent un-editable unit suffix)
                 local ValBoxFrame = Instance.new("Frame")
                 ValBoxFrame.Name = "ValBoxFrame"
                 ValBoxFrame.Active = false
-                ValBoxFrame.Size = UDim2.new(0, 64, 0, 20)
-                ValBoxFrame.Position = UDim2.new(1, -64, 0, 0)
+                ValBoxFrame.AnchorPoint = Vector2.new(1, 0)
+                ValBoxFrame.Position = UDim2.new(1, 0, 0, 0)
+                ValBoxFrame.Size = UDim2.new(0, 0, 0, 20)
+                ValBoxFrame.AutomaticSize = Enum.AutomaticSize.X
                 ValBoxFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
                 ValBoxFrame.BorderSizePixel = 0
                 ValBoxFrame.ZIndex = 25
@@ -2497,14 +2499,28 @@ end
                 ValBoxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 ValBoxStroke.Parent = ValBoxFrame
 
+                local ValBoxLayout = Instance.new("UIListLayout")
+                ValBoxLayout.FillDirection = Enum.FillDirection.Horizontal
+                ValBoxLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+                ValBoxLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                ValBoxLayout.Padding = UDim.new(0, 2)
+                ValBoxLayout.Parent = ValBoxFrame
+
+                local ValBoxPadding = Instance.new("UIPadding")
+                ValBoxPadding.PaddingLeft = UDim.new(0, 6)
+                ValBoxPadding.PaddingRight = UDim.new(0, 6)
+                ValBoxPadding.Parent = ValBoxFrame
+
+                -- Editable Numeric TextBox (Only the number, e.g. 100)
                 local ValBox = Instance.new("TextBox")
                 ValBox.Name = "ValBox"
                 ValBox.Active = false
-                ValBox.Size = UDim2.new(1, -6, 1, 0)
-                ValBox.Position = UDim2.new(0, 3, 0, 0)
+                ValBox.LayoutOrder = 1
+                ValBox.Size = UDim2.new(0, 18, 1, 0)
+                ValBox.AutomaticSize = Enum.AutomaticSize.X
                 ValBox.BackgroundTransparency = 1
                 ValBox.Font = ThemeFontBold
-                ValBox.Text = tostring(curVal) .. suffix
+                ValBox.Text = tostring(curVal)
                 ValBox.TextSize = 11
                 ValBox.TextColor3 = Color3.fromRGB(230, 57, 70)
                 ValBox.TextXAlignment = Enum.TextXAlignment.Center
@@ -2512,6 +2528,27 @@ end
                 ValBox.ClearTextOnFocus = false
                 ValBox.ZIndex = 26
                 ValBox.Parent = ValBoxFrame
+
+                -- Permanent, Non-Editable Unit Label (e.g. %, studs, meters)
+                local cleanSuffix = tostring(suffix or ""):gsub("^%s+", "")
+                local UnitLabel = nil
+                if cleanSuffix ~= "" then
+                    UnitLabel = Instance.new("TextLabel")
+                    UnitLabel.Name = "UnitLabel"
+                    UnitLabel.Active = false
+                    UnitLabel.LayoutOrder = 2
+                    UnitLabel.Size = UDim2.new(0, 0, 1, 0)
+                    UnitLabel.AutomaticSize = Enum.AutomaticSize.X
+                    UnitLabel.BackgroundTransparency = 1
+                    UnitLabel.Font = ThemeFontBold
+                    UnitLabel.Text = cleanSuffix
+                    UnitLabel.TextSize = 11
+                    UnitLabel.TextColor3 = Color3.fromRGB(150, 155, 170)
+                    UnitLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    UnitLabel.TextYAlignment = Enum.TextYAlignment.Center
+                    UnitLabel.ZIndex = 26
+                    UnitLabel.Parent = ValBoxFrame
+                end
 
                 local Track = Instance.new("Frame")
                 Track.Name = "Track"
@@ -2558,7 +2595,7 @@ end
                 local function setSlider(val)
                     curVal = math.clamp(math.round(val), min, max)
                     local pct = (max > min) and ((curVal - min) / (max - min)) or 0
-                    ValBox.Text = tostring(curVal) .. suffix
+                    ValBox.Text = tostring(curVal)
                     Fill.Size = UDim2.new(pct, 0, 1, 0)
                     Thumb.Position = UDim2.new(pct, -5, 0.5, -5)
                     pcall(callback, curVal)
@@ -2569,7 +2606,7 @@ end
                     local trackSize = Track.AbsoluteSize
                     local pct = math.clamp((mouseX - trackPos.X) / trackSize.X, 0, 1)
                     curVal = math.round(min + (max - min) * pct)
-                    ValBox.Text = tostring(curVal) .. suffix
+                    ValBox.Text = tostring(curVal)
                     Fill.Size = UDim2.new(pct, 0, 1, 0)
                     Thumb.Position = UDim2.new(pct, -5, 0.5, -5)
                     pcall(callback, curVal)
@@ -2594,7 +2631,7 @@ end
                     if num then
                         setSlider(num)
                     else
-                        ValBox.Text = tostring(curVal) .. suffix
+                        ValBox.Text = tostring(curVal)
                     end
                 end)
 
