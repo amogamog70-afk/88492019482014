@@ -2219,30 +2219,34 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             end
         end
 
-        if MainFrame.Visible and menuOpen then
-            -- Check Context Menu left clicks
-            if ContextMenu.Visible then
-                if isInside(clickX, clickY, ContextMenu) then
-                    if isInside(clickX, clickY, CtxKeybindRow) then
-                        isListeningKeybind = not isListeningKeybind
+        -- Priority hit-test: Context Menu Modal Overlay
+        -- While open, user can ONLY interact with Context Menu until closed!
+        if ContextMenu.Visible then
+            if isInside(clickX, clickY, ContextMenu) then
+                if isInside(clickX, clickY, CtxKeybindRow) then
+                    isListeningKeybind = not isListeningKeybind
+                    updateContextMenuUI()
+                    return
+                end
+                for mName, mObj in pairs(modeButtons) do
+                    if isInside(clickX, clickY, mObj.row) then
+                        isListeningKeybind = false
+                        activeContextItem.setMode(mName)
                         updateContextMenuUI()
                         return
                     end
-                    for mName, mObj in pairs(modeButtons) do
-                        if isInside(clickX, clickY, mObj.row) then
-                            isListeningKeybind = false
-                            activeContextItem.setMode(mName)
-                            updateContextMenuUI()
-                            return
-                        end
-                    end
-                    return
-                else
-                    ContextMenu.Visible = false
-                    isListeningKeybind = false
-                    activeContextItem = nil
                 end
+                return -- Click inside context menu frame/header absorbed
+            else
+                -- Click outside: dismiss context menu and ABSORB click completely
+                ContextMenu.Visible = false
+                isListeningKeybind = false
+                activeContextItem = nil
+                return
             end
+        end
+
+        if MainFrame.Visible and menuOpen then
 
             -- 2. Check Settings Popup clicks & outside dismissal
             if SettingsPopup and SettingsPopup.Visible then
@@ -2310,6 +2314,13 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
         local clickX = input.Position.X
         local clickY = input.Position.Y
+
+        if ContextMenu.Visible then
+            ContextMenu.Visible = false
+            isListeningKeybind = false
+            activeContextItem = nil
+            return
+        end
 
         if MainFrame.Visible and menuOpen then
             for _, item in ipairs(rightClickRegistry) do
@@ -2405,33 +2416,15 @@ UserInputService.InputChanged:Connect(function(input)
 
         -- Neverlose-style dynamic smooth hover reactions (Zero-GPE)
         if MainFrame.Visible and menuOpen then
-            for _, item in ipairs(clickableRegistry) do
-                if item.object then
-                    local isHov = isInside(mx, my, item.object)
-                    if isHov then
-                        anyInteractiveHovered = true
-                    end
-                    if item.onHover then
-                        if item._isHovered ~= isHov then
-                            item._isHovered = isHov
-                            pcall(item.onHover, isHov)
-                        end
-                    end
-                end
-            end
-
-            for _, s in ipairs(sliderRegistry) do
-                if s.hitbox and isInside(mx, my, s.hitbox) then
-                    anyInteractiveHovered = true
-                    break
-                end
-            end
-
-            if ColorPicker.Window.Visible and isInside(mx, my, ColorPicker.Window) then
-                anyInteractiveHovered = true
-            end
-
             if ContextMenu.Visible then
+                -- Modal isolation: reset any existing hover states outside context menu
+                for _, item in ipairs(clickableRegistry) do
+                    if item._isHovered then
+                        item._isHovered = false
+                        if item.onHover then pcall(item.onHover, false) end
+                    end
+                end
+
                 local isKeybindHov = isInside(mx, my, CtxKeybindRow)
                 if isKeybindHov then anyInteractiveHovered = true end
                 if not isListeningKeybind then
@@ -2464,6 +2457,32 @@ UserInputService.InputChanged:Connect(function(input)
                         }):Play()
                     end
                 end
+            else
+                for _, item in ipairs(clickableRegistry) do
+                    if item.object then
+                        local isHov = isInside(mx, my, item.object)
+                        if isHov then
+                            anyInteractiveHovered = true
+                        end
+                        if item.onHover then
+                            if item._isHovered ~= isHov then
+                                item._isHovered = isHov
+                                pcall(item.onHover, isHov)
+                            end
+                        end
+                    end
+                end
+
+                for _, s in ipairs(sliderRegistry) do
+                    if s.hitbox and isInside(mx, my, s.hitbox) then
+                        anyInteractiveHovered = true
+                        break
+                    end
+                end
+
+                if ColorPicker.Window.Visible and isInside(mx, my, ColorPicker.Window) then
+                    anyInteractiveHovered = true
+                end
             end
         end
 
@@ -2474,7 +2493,9 @@ UserInputService.InputChanged:Connect(function(input)
             end)
         end
 
-        if ColorPicker.HandleDrag(mx, my) then
+        if ContextMenu.Visible then
+            -- Dragging disabled while ContextMenu is open
+        elseif ColorPicker.HandleDrag(mx, my) then
             -- Drag updated
         elseif activeSlider then
             activeSlider.update(input.Position.X)
