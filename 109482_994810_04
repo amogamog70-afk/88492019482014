@@ -2207,13 +2207,15 @@ end
 
         local TabIcon = nil
         if iconAsset then
+            local isWeap = iconAsset:find("116520728661629")
             TabIcon = Instance.new("ImageLabel")
             TabIcon.Name = "TabIcon"
             TabIcon.Active = false
-            TabIcon.Size = UDim2.new(0, 16, 0, 16)
-            TabIcon.Position = UDim2.new(0, 12, 0.5, -8)
+            TabIcon.Size = isWeap and UDim2.new(0, 20, 0, 20) or UDim2.new(0, 16, 0, 16)
+            TabIcon.Position = isWeap and UDim2.new(0, 10, 0.5, -10) or UDim2.new(0, 12, 0.5, -8)
             TabIcon.BackgroundTransparency = 1
             TabIcon.Image = iconAsset
+            TabIcon.ScaleType = Enum.ScaleType.Fit
             TabIcon.ImageColor3 = Color3.fromRGB(130, 135, 150)
             TabIcon.ZIndex = 41
             TabIcon.Parent = TabBtn
@@ -2451,11 +2453,12 @@ end
 
             local colIconAsset = resolveIcon(customIcon)
             if colIconAsset then
+                local isWeap = colIconAsset:find("116520728661629")
                 local ColIcon = Instance.new("ImageLabel")
                 ColIcon.Name = "ColIcon"
                 ColIcon.Active = false
-                ColIcon.Size = UDim2.new(0, 20, 0, 20)
-                ColIcon.Position = UDim2.new(0, 10, 0.5, -10)
+                ColIcon.Size = isWeap and UDim2.new(0, 24, 0, 24) or UDim2.new(0, 15, 0, 15)
+                ColIcon.Position = isWeap and UDim2.new(0, 8, 0.5, -12) or UDim2.new(0, 10, 0.5, -7)
                 ColIcon.BackgroundTransparency = 1
                 ColIcon.Image = colIconAsset
                 ColIcon.ScaleType = Enum.ScaleType.Fit
@@ -2464,11 +2467,12 @@ end
                 ColIcon.Parent = ColHeader
             end
 
+            local isWeapCol = colIconAsset and colIconAsset:find("116520728661629")
             local ColHeaderText = Instance.new("TextLabel")
             ColHeaderText.Name = "ColHeaderText"
             ColHeaderText.Active = false
-            ColHeaderText.Size = colIconAsset and UDim2.new(1, -44, 1, 0) or UDim2.new(1, -24, 1, 0)
-            ColHeaderText.Position = colIconAsset and UDim2.new(0, 36, 0, 0) or UDim2.new(0, 12, 0, 0)
+            ColHeaderText.Size = colIconAsset and (isWeapCol and UDim2.new(1, -46, 1, 0) or UDim2.new(1, -38, 1, 0)) or UDim2.new(1, -24, 1, 0)
+            ColHeaderText.Position = colIconAsset and (isWeapCol and UDim2.new(0, 36, 0, 0) or UDim2.new(0, 30, 0, 0)) or UDim2.new(0, 12, 0, 0)
             ColHeaderText.BackgroundTransparency = 1
             ColHeaderText.Font = ThemeFontBold
             ColHeaderText.Text = colTitle
@@ -3212,10 +3216,11 @@ end
 
             local SubIcon = nil
             if resolvedSubIcon then
+                local isWeap = resolvedSubIcon:find("116520728661629")
                 SubIcon = Instance.new("ImageLabel")
                 SubIcon.Name = "SubIcon"
                 SubIcon.Active = false
-                SubIcon.Size = UDim2.new(0, 16, 0, 16)
+                SubIcon.Size = isWeap and UDim2.new(0, 20, 0, 20) or UDim2.new(0, 14, 0, 14)
                 SubIcon.BackgroundTransparency = 1
                 SubIcon.Image = resolvedSubIcon
                 SubIcon.ScaleType = Enum.ScaleType.Fit
