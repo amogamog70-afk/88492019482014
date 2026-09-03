@@ -125,8 +125,29 @@ local function resolveIcon(iconInput, fallbackName)
     return nil
 end
 
-function DeadHub:GetIcon(identifier)
-    return resolveIcon(identifier)
+-- Color Utilities (File scope to avoid 200 local variables limit)
+local function rgbToHex(color)
+    local r = math.clamp(math.floor(color.R * 255 + 0.5), 0, 255)
+    local g = math.clamp(math.floor(color.G * 255 + 0.5), 0, 255)
+    local b = math.clamp(math.floor(color.B * 255 + 0.5), 0, 255)
+    return string.format("#%02x%02x%02x", r, g, b)
+end
+
+local function hexToRgb(hex)
+    if not hex or type(hex) ~= "string" then return nil end
+    local clean = hex:gsub("#", ""):gsub("%s+", "")
+    if #clean == 3 then
+        local r = tonumber(string.rep(clean:sub(1, 1), 2), 16)
+        local g = tonumber(string.rep(clean:sub(2, 2), 2), 16)
+        local b = tonumber(string.rep(clean:sub(3, 3), 2), 16)
+        if r and g and b then return Color3.fromRGB(r, g, b) end
+    elseif #clean == 6 then
+        local r = tonumber(clean:sub(1, 2), 16)
+        local g = tonumber(clean:sub(3, 4), 16)
+        local b = tonumber(clean:sub(5, 6), 16)
+        if r and g and b then return Color3.fromRGB(r, g, b) end
+    end
+    return nil
 end
 
 function DeadHub:CreateWindow(config)
@@ -1338,10 +1359,8 @@ local function toggleMenu(show)
             SettingsPopup.Visible = false
         end
 
-        if ColorPickerWindow then
-            ColorPickerWindow.Visible = false
-            activeColorPicker = nil
-            activeColorDrag = nil
+        if ColorPicker then
+            ColorPicker.Close()
         end
 
         if isListeningMenuKey then
@@ -1532,422 +1551,513 @@ local function hexToRgb(hex)
     return nil
 end
 
--- Pixel Color Picker Modal (Zero-GPE, Neverlose-styled floating window)
-local activeColorPicker = nil
-local activeColorDrag = nil -- "SV" | "HUE" | "ALPHA"
-local curH, curS, curV = 0.08, 0.64, 0.99 -- Default warm amber/orange (#fea55b)
-local curA = 1
+-- Pixel Color Picker Modal Module (Encapsulated closure to stay within 200 locals limit)
+local ColorPicker = (function()
+    local activeColorPicker = nil
+    local activeColorDrag = nil -- "SV" | "HUE" | "ALPHA"
+    local curH, curS, curV = 0.08, 0.64, 0.99
+    local curA = 1
 
-local ColorPickerWindow = Instance.new("Frame")
-ColorPickerWindow.Name = "DH_ColorPickerWindow"
-ColorPickerWindow.Active = false
-ColorPickerWindow.Visible = false
-ColorPickerWindow.Size = UDim2.new(0, 212, 0, 214)
-ColorPickerWindow.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
-ColorPickerWindow.BorderSizePixel = 0
-ColorPickerWindow.ZIndex = 250
-ColorPickerWindow.Parent = ScreenGui
+    local Window = Instance.new("Frame")
+    Window.Name = "DH_ColorPickerWindow"
+    Window.Active = false
+    Window.Visible = false
+    Window.Size = UDim2.new(0, 212, 0, 214)
+    Window.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+    Window.BorderSizePixel = 0
+    Window.ZIndex = 250
+    Window.Parent = ScreenGui
 
-local CPCorner = Instance.new("UICorner")
-CPCorner.CornerRadius = UDim.new(0, 6)
-CPCorner.Parent = ColorPickerWindow
+    local cpCorner = Instance.new("UICorner")
+    cpCorner.CornerRadius = UDim.new(0, 6)
+    cpCorner.Parent = Window
 
-local CPStroke = Instance.new("UIStroke")
-CPStroke.Thickness = 1
-CPStroke.Color = Color3.fromRGB(44, 46, 56)
-CPStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-CPStroke.Parent = ColorPickerWindow
+    local cpStroke = Instance.new("UIStroke")
+    cpStroke.Thickness = 1
+    cpStroke.Color = Color3.fromRGB(44, 46, 56)
+    cpStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    cpStroke.Parent = Window
 
--- 1. 2D SV Canvas
-local SVCanvas = Instance.new("Frame")
-SVCanvas.Name = "SVCanvas"
-SVCanvas.Active = false
-SVCanvas.Size = UDim2.new(0, 196, 0, 104)
-SVCanvas.Position = UDim2.new(0, 8, 0, 8)
-SVCanvas.BackgroundColor3 = Color3.fromHSV(curH, 1, 1)
-SVCanvas.BorderSizePixel = 0
-SVCanvas.ClipsDescendants = true
-SVCanvas.ZIndex = 251
-SVCanvas.Parent = ColorPickerWindow
-
-local SVCorner = Instance.new("UICorner")
-SVCorner.CornerRadius = UDim.new(0, 4)
-SVCorner.Parent = SVCanvas
-
-local SatLayer = Instance.new("Frame")
-SatLayer.Name = "SatLayer"
-SatLayer.Active = false
-SatLayer.Size = UDim2.new(1, 0, 1, 0)
-SatLayer.BackgroundColor3 = Color3.new(1, 1, 1)
-SatLayer.BorderSizePixel = 0
-SatLayer.ZIndex = 252
-SatLayer.Parent = SVCanvas
-
-local SatGrad = Instance.new("UIGradient")
-SatGrad.Transparency = NumberSequence.new({
-    NumberSequenceKeypoint.new(0, 0),
-    NumberSequenceKeypoint.new(1, 1)
-})
-SatGrad.Parent = SatLayer
-
-local ValLayer = Instance.new("Frame")
-ValLayer.Name = "ValLayer"
-ValLayer.Active = false
-ValLayer.Size = UDim2.new(1, 0, 1, 0)
-ValLayer.BackgroundColor3 = Color3.new(0, 0, 0)
-ValLayer.BorderSizePixel = 0
-ValLayer.ZIndex = 253
-ValLayer.Parent = SVCanvas
-
-local ValGrad = Instance.new("UIGradient")
-ValGrad.Rotation = 90
-ValGrad.Transparency = NumberSequence.new({
-    NumberSequenceKeypoint.new(0, 1),
-    NumberSequenceKeypoint.new(1, 0)
-})
-ValGrad.Parent = ValLayer
-
-local SVCursor = Instance.new("Frame")
-SVCursor.Name = "SVCursor"
-SVCursor.Active = false
-SVCursor.Size = UDim2.new(0, 8, 0, 8)
-SVCursor.AnchorPoint = Vector2.new(0.5, 0.5)
-SVCursor.Position = UDim2.new(curS, 0, 1 - curV, 0)
-SVCursor.BackgroundTransparency = 1
-SVCursor.ZIndex = 254
-SVCursor.Parent = SVCanvas
-
-local SVCursorCorner = Instance.new("UICorner")
-SVCursorCorner.CornerRadius = UDim.new(1, 0)
-SVCursorCorner.Parent = SVCursor
-
-local SVCursorStroke = Instance.new("UIStroke")
-SVCursorStroke.Thickness = 1.5
-SVCursorStroke.Color = Color3.fromRGB(255, 255, 255)
-SVCursorStroke.Parent = SVCursor
-
--- 2. Middle Section: Preview Box & Sliders
-local PreviewBox = Instance.new("Frame")
-PreviewBox.Name = "PreviewBox"
-PreviewBox.Active = false
-PreviewBox.Size = UDim2.new(0, 28, 0, 28)
-PreviewBox.Position = UDim2.new(0, 8, 0, 118)
-PreviewBox.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
-PreviewBox.BorderSizePixel = 0
-PreviewBox.ZIndex = 251
-PreviewBox.Parent = ColorPickerWindow
-
-local PreviewCorner = Instance.new("UICorner")
-PreviewCorner.CornerRadius = UDim.new(0, 4)
-PreviewCorner.Parent = PreviewBox
-
-local PreviewStroke = Instance.new("UIStroke")
-PreviewStroke.Thickness = 1
-PreviewStroke.Color = Color3.fromRGB(44, 46, 56)
-PreviewStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-PreviewStroke.Parent = PreviewBox
-
-local PreviewColor = Instance.new("Frame")
-PreviewColor.Name = "PreviewColor"
-PreviewColor.Active = false
-PreviewColor.Size = UDim2.new(1, 0, 1, 0)
-PreviewColor.BackgroundColor3 = Color3.fromHSV(curH, curS, curV)
-PreviewColor.BorderSizePixel = 0
-PreviewColor.ZIndex = 252
-PreviewColor.Parent = PreviewBox
-
-local PreviewColorCorner = Instance.new("UICorner")
-PreviewColorCorner.CornerRadius = UDim.new(0, 4)
-PreviewColorCorner.Parent = PreviewColor
-
--- Hue Slider Bar (Rainbow 7-stops)
-local HueBar = Instance.new("Frame")
-HueBar.Name = "HueBar"
-HueBar.Active = false
-HueBar.Size = UDim2.new(0, 160, 0, 12)
-HueBar.Position = UDim2.new(0, 44, 0, 118)
-HueBar.BackgroundColor3 = Color3.new(1, 1, 1)
-HueBar.BorderSizePixel = 0
-HueBar.ZIndex = 251
-HueBar.Parent = ColorPickerWindow
-
-local HueCorner = Instance.new("UICorner")
-HueCorner.CornerRadius = UDim.new(0, 3)
-HueCorner.Parent = HueBar
-
-local HueStroke = Instance.new("UIStroke")
-HueStroke.Thickness = 1
-HueStroke.Color = Color3.fromRGB(36, 38, 46)
-HueStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-HueStroke.Parent = HueBar
-
-local HueGrad = Instance.new("UIGradient")
-HueGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
-    ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
-    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
-    ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 255)),
-    ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
-    ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
-    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0))
-})
-HueGrad.Parent = HueBar
-
-local HueThumb = Instance.new("Frame")
-HueThumb.Name = "HueThumb"
-HueThumb.Active = false
-HueThumb.Size = UDim2.new(0, 4, 1, 4)
-HueThumb.AnchorPoint = Vector2.new(0.5, 0.5)
-HueThumb.Position = UDim2.new(curH, 0, 0.5, 0)
-HueThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-HueThumb.BorderSizePixel = 0
-HueThumb.ZIndex = 254
-HueThumb.Parent = HueBar
-
-local HueThumbCorner = Instance.new("UICorner")
-HueThumbCorner.CornerRadius = UDim.new(0, 2)
-HueThumbCorner.Parent = HueThumb
-
-local HueThumbStroke = Instance.new("UIStroke")
-HueThumbStroke.Thickness = 1
-HueThumbStroke.Color = Color3.fromRGB(20, 20, 24)
-HueThumbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-HueThumbStroke.Parent = HueThumb
-
--- Alpha Slider Bar
-local AlphaBar = Instance.new("Frame")
-AlphaBar.Name = "AlphaBar"
-AlphaBar.Active = false
-AlphaBar.Size = UDim2.new(0, 160, 0, 12)
-AlphaBar.Position = UDim2.new(0, 44, 0, 134)
-AlphaBar.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
-AlphaBar.BorderSizePixel = 0
-AlphaBar.ZIndex = 251
-AlphaBar.Parent = ColorPickerWindow
-
-local AlphaCorner = Instance.new("UICorner")
-AlphaCorner.CornerRadius = UDim.new(0, 3)
-AlphaCorner.Parent = AlphaBar
-
-local AlphaStroke = Instance.new("UIStroke")
-AlphaStroke.Thickness = 1
-AlphaStroke.Color = Color3.fromRGB(36, 38, 46)
-AlphaStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-AlphaStroke.Parent = AlphaBar
-
-local AlphaColorLayer = Instance.new("Frame")
-AlphaColorLayer.Name = "AlphaColorLayer"
-AlphaColorLayer.Active = false
-AlphaColorLayer.Size = UDim2.new(1, 0, 1, 0)
-AlphaColorLayer.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-AlphaColorLayer.BorderSizePixel = 0
-AlphaColorLayer.ZIndex = 252
-AlphaColorLayer.Parent = AlphaBar
-
-local AlphaColorCorner = Instance.new("UICorner")
-AlphaColorCorner.CornerRadius = UDim.new(0, 3)
-AlphaColorCorner.Parent = AlphaColorLayer
-
-local AlphaGrad = Instance.new("UIGradient")
-AlphaGrad.Transparency = NumberSequence.new({
-    NumberSequenceKeypoint.new(0, 1),
-    NumberSequenceKeypoint.new(1, 0)
-})
-AlphaGrad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
-AlphaGrad.Parent = AlphaColorLayer
-
-local AlphaThumb = Instance.new("Frame")
-AlphaThumb.Name = "AlphaThumb"
-AlphaThumb.Active = false
-AlphaThumb.Size = UDim2.new(0, 4, 1, 4)
-AlphaThumb.AnchorPoint = Vector2.new(0.5, 0.5)
-AlphaThumb.Position = UDim2.new(curA, 0, 0.5, 0)
-AlphaThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-AlphaThumb.BorderSizePixel = 0
-AlphaThumb.ZIndex = 254
-AlphaThumb.Parent = AlphaBar
-
-local AlphaThumbCorner = Instance.new("UICorner")
-AlphaThumbCorner.CornerRadius = UDim.new(0, 2)
-AlphaThumbCorner.Parent = AlphaThumb
-
-local AlphaThumbStroke = Instance.new("UIStroke")
-AlphaThumbStroke.Thickness = 1
-AlphaThumbStroke.Color = Color3.fromRGB(20, 20, 24)
-AlphaThumbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-AlphaThumbStroke.Parent = AlphaThumb
-
--- 3. Numeric & HEX Input Boxes
-local function createCPInputBox(parent, name, prefix, width, posX, posY)
-    local frame = Instance.new("Frame")
-    frame.Name = name
-    frame.Active = false
-    frame.Size = UDim2.new(0, width, 0, 22)
-    frame.Position = UDim2.new(0, posX, 0, posY)
-    frame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
-    frame.BorderSizePixel = 0
-    frame.ZIndex = 252
-    frame.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 3)
-    corner.Parent = frame
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Thickness = 1
-    stroke.Color = Color3.fromRGB(38, 40, 50)
-    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    stroke.Parent = frame
-
-    local prefixW = prefix == "HEX" and 26 or 14
-    local lbl = Instance.new("TextLabel")
-    lbl.Name = "Prefix"
-    lbl.Active = false
-    lbl.Size = UDim2.new(0, prefixW, 1, 0)
-    lbl.Position = UDim2.new(0, 4, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Font = ThemeFontBold
-    lbl.Text = prefix
-    lbl.TextSize = 10
-    lbl.TextColor3 = Color3.fromRGB(120, 125, 140)
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.TextYAlignment = Enum.TextYAlignment.Center
-    lbl.ZIndex = 253
-    lbl.Parent = frame
-
-    local box = Instance.new("TextBox")
-    box.Name = "Box"
-    box.Active = false
-    box.Size = UDim2.new(1, -prefixW - 6, 1, 0)
-    box.Position = UDim2.new(0, prefixW + 4, 0, 0)
-    box.BackgroundTransparency = 1
-    box.Font = ThemeFont
-    box.Text = ""
-    box.TextSize = 11
-    box.TextColor3 = Color3.fromRGB(230, 235, 245)
-    box.TextXAlignment = Enum.TextXAlignment.Center
-    box.ClearTextOnFocus = false
-    box.ZIndex = 253
-    box.Parent = frame
-
-    box.Focused:Connect(function()
-        TweenService:Create(stroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(230, 57, 70)}):Play()
-    end)
-    box.FocusLost:Connect(function()
-        TweenService:Create(stroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(38, 40, 50)}):Play()
-    end)
-
-    return frame, box, stroke
-end
-
-local rFrame, rBox, rStroke = createCPInputBox(ColorPickerWindow, "RBox", "R", 61, 8, 154)
-local gFrame, gBox, gStroke = createCPInputBox(ColorPickerWindow, "GBox", "G", 61, 75, 154)
-local bFrame, bBox, bStroke = createCPInputBox(ColorPickerWindow, "BBox", "B", 62, 142, 154)
-local hexFrame, hexBox, hexStroke = createCPInputBox(ColorPickerWindow, "HexBox", "HEX", 128, 8, 182)
-local aFrame, aBox, aStroke = createCPInputBox(ColorPickerWindow, "ABox", "A", 62, 142, 182)
-
--- Sync and Refresh function
-local function syncColorPickerUI(skipInputs)
-    local solidColor = Color3.fromHSV(curH, curS, curV)
+    -- 1. 2D SV Canvas
+    local SVCanvas = Instance.new("Frame")
+    SVCanvas.Name = "SVCanvas"
+    SVCanvas.Active = false
+    SVCanvas.Size = UDim2.new(0, 196, 0, 104)
+    SVCanvas.Position = UDim2.new(0, 8, 0, 8)
     SVCanvas.BackgroundColor3 = Color3.fromHSV(curH, 1, 1)
-    SVCursor.Position = UDim2.new(math.clamp(curS, 0, 1), 0, math.clamp(1 - curV, 0, 1), 0)
-    HueThumb.Position = UDim2.new(math.clamp(curH, 0, 1), 0, 0.5, 0)
-    AlphaThumb.Position = UDim2.new(math.clamp(curA, 0, 1), 0, 0.5, 0)
-    AlphaGrad.Color = ColorSequence.new(solidColor)
-    PreviewColor.BackgroundColor3 = solidColor
-    PreviewColor.BackgroundTransparency = 1 - curA
+    SVCanvas.BorderSizePixel = 0
+    SVCanvas.ClipsDescendants = true
+    SVCanvas.ZIndex = 251
+    SVCanvas.Parent = Window
 
-    if not skipInputs then
-        rBox.Text = tostring(math.round(solidColor.R * 255))
-        gBox.Text = tostring(math.round(solidColor.G * 255))
-        bBox.Text = tostring(math.round(solidColor.B * 255))
-        hexBox.Text = rgbToHex(solidColor)
-        aBox.Text = tostring(math.round(curA * 100))
+    local svCorner = Instance.new("UICorner")
+    svCorner.CornerRadius = UDim.new(0, 4)
+    svCorner.Parent = SVCanvas
+
+    local SatLayer = Instance.new("Frame")
+    SatLayer.Name = "SatLayer"
+    SatLayer.Active = false
+    SatLayer.Size = UDim2.new(1, 0, 1, 0)
+    SatLayer.BackgroundColor3 = Color3.new(1, 1, 1)
+    SatLayer.BorderSizePixel = 0
+    SatLayer.ZIndex = 252
+    SatLayer.Parent = SVCanvas
+
+    local satGrad = Instance.new("UIGradient")
+    satGrad.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    satGrad.Parent = SatLayer
+
+    local ValLayer = Instance.new("Frame")
+    ValLayer.Name = "ValLayer"
+    ValLayer.Active = false
+    ValLayer.Size = UDim2.new(1, 0, 1, 0)
+    ValLayer.BackgroundColor3 = Color3.new(0, 0, 0)
+    ValLayer.BorderSizePixel = 0
+    ValLayer.ZIndex = 253
+    ValLayer.Parent = SVCanvas
+
+    local valGrad = Instance.new("UIGradient")
+    valGrad.Rotation = 90
+    valGrad.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(1, 0)
+    })
+    valGrad.Parent = ValLayer
+
+    local SVCursor = Instance.new("Frame")
+    SVCursor.Name = "SVCursor"
+    SVCursor.Active = false
+    SVCursor.Size = UDim2.new(0, 8, 0, 8)
+    SVCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+    SVCursor.Position = UDim2.new(curS, 0, 1 - curV, 0)
+    SVCursor.BackgroundTransparency = 1
+    SVCursor.ZIndex = 254
+    SVCursor.Parent = SVCanvas
+
+    local svCursorCorner = Instance.new("UICorner")
+    svCursorCorner.CornerRadius = UDim.new(1, 0)
+    svCursorCorner.Parent = SVCursor
+
+    local svCursorStroke = Instance.new("UIStroke")
+    svCursorStroke.Thickness = 1.5
+    svCursorStroke.Color = Color3.fromRGB(255, 255, 255)
+    svCursorStroke.Parent = SVCursor
+
+    -- 2. Middle Section: Preview Box & Sliders
+    local PreviewBox = Instance.new("Frame")
+    PreviewBox.Name = "PreviewBox"
+    PreviewBox.Active = false
+    PreviewBox.Size = UDim2.new(0, 28, 0, 28)
+    PreviewBox.Position = UDim2.new(0, 8, 0, 118)
+    PreviewBox.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+    PreviewBox.BorderSizePixel = 0
+    PreviewBox.ZIndex = 251
+    PreviewBox.Parent = Window
+
+    local prevCorner = Instance.new("UICorner")
+    prevCorner.CornerRadius = UDim.new(0, 4)
+    prevCorner.Parent = PreviewBox
+
+    local prevStroke = Instance.new("UIStroke")
+    prevStroke.Thickness = 1
+    prevStroke.Color = Color3.fromRGB(44, 46, 56)
+    prevStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    prevStroke.Parent = PreviewBox
+
+    local PreviewColor = Instance.new("Frame")
+    PreviewColor.Name = "PreviewColor"
+    PreviewColor.Active = false
+    PreviewColor.Size = UDim2.new(1, 0, 1, 0)
+    PreviewColor.BackgroundColor3 = Color3.fromHSV(curH, curS, curV)
+    PreviewColor.BorderSizePixel = 0
+    PreviewColor.ZIndex = 252
+    PreviewColor.Parent = PreviewBox
+
+    local prevColCorner = Instance.new("UICorner")
+    prevColCorner.CornerRadius = UDim.new(0, 4)
+    prevColCorner.Parent = PreviewColor
+
+    -- Hue Slider Bar (Rainbow 7-stops)
+    local HueBar = Instance.new("Frame")
+    HueBar.Name = "HueBar"
+    HueBar.Active = false
+    HueBar.Size = UDim2.new(0, 160, 0, 12)
+    HueBar.Position = UDim2.new(0, 44, 0, 118)
+    HueBar.BackgroundColor3 = Color3.new(1, 1, 1)
+    HueBar.BorderSizePixel = 0
+    HueBar.ZIndex = 251
+    HueBar.Parent = Window
+
+    local hueCorner = Instance.new("UICorner")
+    hueCorner.CornerRadius = UDim.new(0, 3)
+    hueCorner.Parent = HueBar
+
+    local hueStroke = Instance.new("UIStroke")
+    hueStroke.Thickness = 1
+    hueStroke.Color = Color3.fromRGB(36, 38, 46)
+    hueStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    hueStroke.Parent = HueBar
+
+    local hueGrad = Instance.new("UIGradient")
+    hueGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+        ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 255)),
+        ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+        ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0))
+    })
+    hueGrad.Parent = HueBar
+
+    local HueThumb = Instance.new("Frame")
+    HueThumb.Name = "HueThumb"
+    HueThumb.Active = false
+    HueThumb.Size = UDim2.new(0, 4, 1, 4)
+    HueThumb.AnchorPoint = Vector2.new(0.5, 0.5)
+    HueThumb.Position = UDim2.new(curH, 0, 0.5, 0)
+    HueThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    HueThumb.BorderSizePixel = 0
+    HueThumb.ZIndex = 254
+    HueThumb.Parent = HueBar
+
+    local hueThumbCorner = Instance.new("UICorner")
+    hueThumbCorner.CornerRadius = UDim.new(0, 2)
+    hueThumbCorner.Parent = HueThumb
+
+    local hueThumbStroke = Instance.new("UIStroke")
+    hueThumbStroke.Thickness = 1
+    hueThumbStroke.Color = Color3.fromRGB(20, 20, 24)
+    hueThumbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    hueThumbStroke.Parent = HueThumb
+
+    -- Alpha Slider Bar
+    local AlphaBar = Instance.new("Frame")
+    AlphaBar.Name = "AlphaBar"
+    AlphaBar.Active = false
+    AlphaBar.Size = UDim2.new(0, 160, 0, 12)
+    AlphaBar.Position = UDim2.new(0, 44, 0, 134)
+    AlphaBar.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+    AlphaBar.BorderSizePixel = 0
+    AlphaBar.ZIndex = 251
+    AlphaBar.Parent = Window
+
+    local alphaCorner = Instance.new("UICorner")
+    alphaCorner.CornerRadius = UDim.new(0, 3)
+    alphaCorner.Parent = AlphaBar
+
+    local alphaStroke = Instance.new("UIStroke")
+    alphaStroke.Thickness = 1
+    alphaStroke.Color = Color3.fromRGB(36, 38, 46)
+    alphaStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    alphaStroke.Parent = AlphaBar
+
+    local AlphaColorLayer = Instance.new("Frame")
+    AlphaColorLayer.Name = "AlphaColorLayer"
+    AlphaColorLayer.Active = false
+    AlphaColorLayer.Size = UDim2.new(1, 0, 1, 0)
+    AlphaColorLayer.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    AlphaColorLayer.BorderSizePixel = 0
+    AlphaColorLayer.ZIndex = 252
+    AlphaColorLayer.Parent = AlphaBar
+
+    local alphaColCorner = Instance.new("UICorner")
+    alphaColCorner.CornerRadius = UDim.new(0, 3)
+    alphaColCorner.Parent = AlphaColorLayer
+
+    local AlphaGrad = Instance.new("UIGradient")
+    AlphaGrad.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(1, 0)
+    })
+    AlphaGrad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 255, 255))
+    AlphaGrad.Parent = AlphaColorLayer
+
+    local AlphaThumb = Instance.new("Frame")
+    AlphaThumb.Name = "AlphaThumb"
+    AlphaThumb.Active = false
+    AlphaThumb.Size = UDim2.new(0, 4, 1, 4)
+    AlphaThumb.AnchorPoint = Vector2.new(0.5, 0.5)
+    AlphaThumb.Position = UDim2.new(curA, 0, 0.5, 0)
+    AlphaThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    AlphaThumb.BorderSizePixel = 0
+    AlphaThumb.ZIndex = 254
+    AlphaThumb.Parent = AlphaBar
+
+    local alphaThumbCorner = Instance.new("UICorner")
+    alphaThumbCorner.CornerRadius = UDim.new(0, 2)
+    alphaThumbCorner.Parent = AlphaThumb
+
+    local alphaThumbStroke = Instance.new("UIStroke")
+    alphaThumbStroke.Thickness = 1
+    alphaThumbStroke.Color = Color3.fromRGB(20, 20, 24)
+    alphaThumbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    alphaThumbStroke.Parent = AlphaThumb
+
+    -- 3. Inputs
+    local function createBox(name, prefix, width, posX, posY)
+        local frame = Instance.new("Frame")
+        frame.Name = name
+        frame.Active = false
+        frame.Size = UDim2.new(0, width, 0, 22)
+        frame.Position = UDim2.new(0, posX, 0, posY)
+        frame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+        frame.BorderSizePixel = 0
+        frame.ZIndex = 252
+        frame.Parent = Window
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 3)
+        c.Parent = frame
+
+        local s = Instance.new("UIStroke")
+        s.Thickness = 1
+        s.Color = Color3.fromRGB(38, 40, 50)
+        s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        s.Parent = frame
+
+        local prefixW = prefix == "HEX" and 26 or 14
+        local lbl = Instance.new("TextLabel")
+        lbl.Name = "Prefix"
+        lbl.Active = false
+        lbl.Size = UDim2.new(0, prefixW, 1, 0)
+        lbl.Position = UDim2.new(0, 4, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Font = ThemeFontBold
+        lbl.Text = prefix
+        lbl.TextSize = 10
+        lbl.TextColor3 = Color3.fromRGB(120, 125, 140)
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextYAlignment = Enum.TextYAlignment.Center
+        lbl.ZIndex = 253
+        lbl.Parent = frame
+
+        local box = Instance.new("TextBox")
+        box.Name = "Box"
+        box.Active = false
+        box.Size = UDim2.new(1, -prefixW - 6, 1, 0)
+        box.Position = UDim2.new(0, prefixW + 4, 0, 0)
+        box.BackgroundTransparency = 1
+        box.Font = ThemeFont
+        box.Text = ""
+        box.TextSize = 11
+        box.TextColor3 = Color3.fromRGB(230, 235, 245)
+        box.TextXAlignment = Enum.TextXAlignment.Center
+        box.ClearTextOnFocus = false
+        box.ZIndex = 253
+        box.Parent = frame
+
+        box.Focused:Connect(function()
+            TweenService:Create(s, TweenInfo.new(0.12), {Color = Color3.fromRGB(230, 57, 70)}):Play()
+        end)
+        box.FocusLost:Connect(function()
+            TweenService:Create(s, TweenInfo.new(0.12), {Color = Color3.fromRGB(38, 40, 50)}):Play()
+        end)
+
+        return frame, box
     end
 
-    if activeColorPicker then
-        if activeColorPicker.swatchColor then
-            activeColorPicker.swatchColor.BackgroundColor3 = solidColor
-            activeColorPicker.swatchColor.BackgroundTransparency = 1 - curA
+    local rFrame, rBox = createBox("RBox", "R", 61, 8, 154)
+    local gFrame, gBox = createBox("GBox", "G", 61, 75, 154)
+    local bFrame, bBox = createBox("BBox", "B", 62, 142, 154)
+    local hexFrame, hexBox = createBox("HexBox", "HEX", 128, 8, 182)
+    local aFrame, aBox = createBox("ABox", "A", 62, 142, 182)
+
+    local function syncUI(skipInputs)
+        local solidColor = Color3.fromHSV(curH, curS, curV)
+        SVCanvas.BackgroundColor3 = Color3.fromHSV(curH, 1, 1)
+        SVCursor.Position = UDim2.new(math.clamp(curS, 0, 1), 0, math.clamp(1 - curV, 0, 1), 0)
+        HueThumb.Position = UDim2.new(math.clamp(curH, 0, 1), 0, 0.5, 0)
+        AlphaThumb.Position = UDim2.new(math.clamp(curA, 0, 1), 0, 0.5, 0)
+        AlphaGrad.Color = ColorSequence.new(solidColor, solidColor)
+        PreviewColor.BackgroundColor3 = solidColor
+        PreviewColor.BackgroundTransparency = 1 - curA
+
+        if not skipInputs then
+            rBox.Text = tostring(math.clamp(math.floor(solidColor.R * 255 + 0.5), 0, 255))
+            gBox.Text = tostring(math.clamp(math.floor(solidColor.G * 255 + 0.5), 0, 255))
+            bBox.Text = tostring(math.clamp(math.floor(solidColor.B * 255 + 0.5), 0, 255))
+            hexBox.Text = rgbToHex(solidColor)
+            aBox.Text = tostring(math.clamp(math.floor(curA * 100 + 0.5), 0, 100))
         end
-        pcall(activeColorPicker.callback, solidColor, curA)
+
+        if activeColorPicker then
+            if activeColorPicker.swatchColor then
+                activeColorPicker.swatchColor.BackgroundColor3 = solidColor
+                activeColorPicker.swatchColor.BackgroundTransparency = 1 - curA
+            end
+            pcall(activeColorPicker.callback, solidColor, curA)
+        end
     end
-end
 
-rBox.FocusLost:Connect(function()
-    local n = tonumber(rBox.Text:gsub("[^%d]", "")) or 0
-    n = math.clamp(math.round(n), 0, 255)
-    local solid = Color3.fromHSV(curH, curS, curV)
-    local newC = Color3.fromRGB(n, math.round(solid.G * 255), math.round(solid.B * 255))
-    curH, curS, curV = newC:ToHSV()
-    syncColorPickerUI()
-end)
+    rBox.FocusLost:Connect(function()
+        local n = tonumber(rBox.Text:gsub("[^%d]", "")) or 0
+        n = math.clamp(n, 0, 255)
+        local solid = Color3.fromHSV(curH, curS, curV)
+        local newC = Color3.fromRGB(n, math.floor(solid.G * 255 + 0.5), math.floor(solid.B * 255 + 0.5))
+        curH, curS, curV = Color3.toHSV(newC)
+        syncUI()
+    end)
 
-gBox.FocusLost:Connect(function()
-    local n = tonumber(gBox.Text:gsub("[^%d]", "")) or 0
-    n = math.clamp(math.round(n), 0, 255)
-    local solid = Color3.fromHSV(curH, curS, curV)
-    local newC = Color3.fromRGB(math.round(solid.R * 255), n, math.round(solid.B * 255))
-    curH, curS, curV = newC:ToHSV()
-    syncColorPickerUI()
-end)
+    gBox.FocusLost:Connect(function()
+        local n = tonumber(gBox.Text:gsub("[^%d]", "")) or 0
+        n = math.clamp(n, 0, 255)
+        local solid = Color3.fromHSV(curH, curS, curV)
+        local newC = Color3.fromRGB(math.floor(solid.R * 255 + 0.5), n, math.floor(solid.B * 255 + 0.5))
+        curH, curS, curV = Color3.toHSV(newC)
+        syncUI()
+    end)
 
-bBox.FocusLost:Connect(function()
-    local n = tonumber(bBox.Text:gsub("[^%d]", "")) or 0
-    n = math.clamp(math.round(n), 0, 255)
-    local solid = Color3.fromHSV(curH, curS, curV)
-    local newC = Color3.fromRGB(math.round(solid.R * 255), math.round(solid.G * 255), n)
-    curH, curS, curV = newC:ToHSV()
-    syncColorPickerUI()
-end)
+    bBox.FocusLost:Connect(function()
+        local n = tonumber(bBox.Text:gsub("[^%d]", "")) or 0
+        n = math.clamp(n, 0, 255)
+        local solid = Color3.fromHSV(curH, curS, curV)
+        local newC = Color3.fromRGB(math.floor(solid.R * 255 + 0.5), math.floor(solid.G * 255 + 0.5), n)
+        curH, curS, curV = Color3.toHSV(newC)
+        syncUI()
+    end)
 
-hexBox.FocusLost:Connect(function()
-    local c = hexToRgb(hexBox.Text)
-    if c then
-        curH, curS, curV = c:ToHSV()
+    hexBox.FocusLost:Connect(function()
+        local c = hexToRgb(hexBox.Text)
+        if c then
+            curH, curS, curV = Color3.toHSV(c)
+        end
+        syncUI()
+    end)
+
+    aBox.FocusLost:Connect(function()
+        local n = tonumber(aBox.Text:gsub("[^%d]", "")) or 100
+        curA = math.clamp(n, 0, 100) / 100
+        syncUI()
+    end)
+
+    local function open(anchorObj, swatchColor, defaultColor, defaultAlpha, callback)
+        if activeColorPicker and activeColorPicker.swatch == anchorObj and Window.Visible then
+            Window.Visible = false
+            activeColorPicker = nil
+            return
+        end
+
+        activeColorPicker = {
+            swatch = anchorObj,
+            swatchColor = swatchColor,
+            callback = callback or function() end
+        }
+
+        local initColor = defaultColor or Color3.fromRGB(254, 165, 91)
+        curH, curS, curV = Color3.toHSV(initColor)
+        curA = defaultAlpha ~= nil and math.clamp(defaultAlpha, 0, 1) or 1
+
+        local ap = anchorObj.AbsolutePosition
+        local as = anchorObj.AbsoluteSize
+        local vp = getViewportSize()
+
+        local targetX = ap.X - 222
+        if targetX < 10 then
+            targetX = ap.X + as.X + 8
+        end
+        targetX = math.clamp(targetX, 10, math.max(10, vp.X - 226))
+        local targetY = math.clamp(ap.Y - 20, 10, math.max(10, vp.Y - 230))
+
+        Window.Position = UDim2.fromOffset(targetX, targetY)
+        Window.Visible = true
+        syncUI()
     end
-    syncColorPickerUI()
-end)
 
-aBox.FocusLost:Connect(function()
-    local n = tonumber(aBox.Text:gsub("[^%d]", "")) or 100
-    n = math.clamp(math.round(n), 0, 100)
-    curA = n / 100
-    syncColorPickerUI()
-end)
-
-local function openColorPicker(anchorObj, swatchColor, defaultColor, defaultAlpha, callback)
-    if activeColorPicker and activeColorPicker.swatch == anchorObj and ColorPickerWindow.Visible then
-        ColorPickerWindow.Visible = false
+    local function close()
+        Window.Visible = false
         activeColorPicker = nil
-        return
+        activeColorDrag = nil
     end
 
-    activeColorPicker = {
-        swatch = anchorObj,
-        swatchColor = swatchColor,
-        callback = callback or function() end
+    local function handleClick(clickX, clickY)
+        if not Window.Visible then return false end
+
+        if isInside(clickX, clickY, Window) then
+            if isInside(clickX, clickY, SVCanvas) then
+                activeColorDrag = "SV"
+                local svPos = SVCanvas.AbsolutePosition
+                local svSize = SVCanvas.AbsoluteSize
+                curS = math.clamp((clickX - svPos.X) / svSize.X, 0, 1)
+                curV = 1 - math.clamp((clickY - svPos.Y) / svSize.Y, 0, 1)
+                syncUI()
+                return true
+            elseif isInside(clickX, clickY, HueBar) then
+                activeColorDrag = "HUE"
+                local hPos = HueBar.AbsolutePosition
+                local hSize = HueBar.AbsoluteSize
+                curH = math.clamp((clickX - hPos.X) / hSize.X, 0, 1)
+                syncUI()
+                return true
+            elseif isInside(clickX, clickY, AlphaBar) then
+                activeColorDrag = "ALPHA"
+                local aPos = AlphaBar.AbsolutePosition
+                local aSize = AlphaBar.AbsoluteSize
+                curA = math.clamp((clickX - aPos.X) / aSize.X, 0, 1)
+                syncUI()
+                return true
+            elseif isInside(clickX, clickY, rFrame) then
+                rBox:CaptureFocus()
+                return true
+            elseif isInside(clickX, clickY, gFrame) then
+                gBox:CaptureFocus()
+                return true
+            elseif isInside(clickX, clickY, bFrame) then
+                bBox:CaptureFocus()
+                return true
+            elseif isInside(clickX, clickY, hexFrame) then
+                hexBox:CaptureFocus()
+                return true
+            elseif isInside(clickX, clickY, aFrame) then
+                aBox:CaptureFocus()
+                return true
+            end
+            return true -- Absorbed
+        else
+            local isSwatch = activeColorPicker and activeColorPicker.swatch and isInside(clickX, clickY, activeColorPicker.swatch)
+            close()
+            return isSwatch
+        end
+    end
+
+    local function handleDrag(mx, my)
+        if not activeColorDrag then return false end
+        if activeColorDrag == "SV" then
+            local svPos = SVCanvas.AbsolutePosition
+            local svSize = SVCanvas.AbsoluteSize
+            curS = math.clamp((mx - svPos.X) / svSize.X, 0, 1)
+            curV = 1 - math.clamp((my - svPos.Y) / svSize.Y, 0, 1)
+            syncUI()
+            return true
+        elseif activeColorDrag == "HUE" then
+            local hPos = HueBar.AbsolutePosition
+            local hSize = HueBar.AbsoluteSize
+            curH = math.clamp((mx - hPos.X) / hSize.X, 0, 1)
+            syncUI()
+            return true
+        elseif activeColorDrag == "ALPHA" then
+            local aPos = AlphaBar.AbsolutePosition
+            local aSize = AlphaBar.AbsoluteSize
+            curA = math.clamp((mx - aPos.X) / aSize.X, 0, 1)
+            syncUI()
+            return true
+        end
+        return false
+    end
+
+    return {
+        Window = Window,
+        Open = open,
+        Close = close,
+        HandleClick = handleClick,
+        HandleDrag = handleDrag,
+        EndDrag = function() activeColorDrag = nil end,
+        IsDragging = function() return activeColorDrag ~= nil end
     }
-
-    local initColor = defaultColor or Color3.fromRGB(254, 165, 91)
-    curH, curS, curV = initColor:ToHSV()
-    curA = defaultAlpha ~= nil and math.clamp(defaultAlpha, 0, 1) or 1
-
-    local ap = anchorObj.AbsolutePosition
-    local as = anchorObj.AbsoluteSize
-    local vp = getViewportSize()
-
-    local targetX = ap.X - 222
-    if targetX < 10 then
-        targetX = ap.X + as.X + 8
-    end
-    targetX = math.clamp(targetX, 10, math.max(10, vp.X - 226))
-    local targetY = math.clamp(ap.Y - 20, 10, math.max(10, vp.Y - 230))
-
-    ColorPickerWindow.Position = UDim2.fromOffset(targetX, targetY)
-    ColorPickerWindow.Visible = true
-    syncColorPickerUI()
-end
+end)()
 
 -- Context Menu for Function Modes (Always / Toggle / Hold) & Keybinds
 local ContextMenu = Instance.new("Frame")
@@ -2124,58 +2234,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end
 
         -- Priority hit-test: ColorPicker Window
-        if ColorPickerWindow.Visible then
-            if isInside(clickX, clickY, ColorPickerWindow) then
-                if isInside(clickX, clickY, SVCanvas) then
-                    activeColorDrag = "SV"
-                    local svPos = SVCanvas.AbsolutePosition
-                    local svSize = SVCanvas.AbsoluteSize
-                    curS = math.clamp((clickX - svPos.X) / svSize.X, 0, 1)
-                    curV = 1 - math.clamp((clickY - svPos.Y) / svSize.Y, 0, 1)
-                    syncColorPickerUI()
-                    return
-                elseif isInside(clickX, clickY, HueBar) then
-                    activeColorDrag = "HUE"
-                    local hPos = HueBar.AbsolutePosition
-                    local hSize = HueBar.AbsoluteSize
-                    curH = math.clamp((clickX - hPos.X) / hSize.X, 0, 1)
-                    syncColorPickerUI()
-                    return
-                elseif isInside(clickX, clickY, AlphaBar) then
-                    activeColorDrag = "ALPHA"
-                    local aPos = AlphaBar.AbsolutePosition
-                    local aSize = AlphaBar.AbsoluteSize
-                    curA = math.clamp((clickX - aPos.X) / aSize.X, 0, 1)
-                    syncColorPickerUI()
-                    return
-                elseif isInside(clickX, clickY, rFrame) then
-                    rBox:CaptureFocus()
-                    return
-                elseif isInside(clickX, clickY, gFrame) then
-                    gBox:CaptureFocus()
-                    return
-                elseif isInside(clickX, clickY, bFrame) then
-                    bBox:CaptureFocus()
-                    return
-                elseif isInside(clickX, clickY, hexFrame) then
-                    hexBox:CaptureFocus()
-                    return
-                elseif isInside(clickX, clickY, aFrame) then
-                    aBox:CaptureFocus()
-                    return
-                end
-                return -- Click was inside ColorPicker window body, keep open
-            else
-                local isSwatchClick = false
-                if activeColorPicker and activeColorPicker.swatch and isInside(clickX, clickY, activeColorPicker.swatch) then
-                    isSwatchClick = true
-                end
-                ColorPickerWindow.Visible = false
-                activeColorPicker = nil
-                activeColorDrag = nil
-                if isSwatchClick then
-                    return
-                end
+        if ColorPicker.Window.Visible then
+            if ColorPicker.HandleClick(clickX, clickY) then
+                return
             end
         end
 
@@ -2287,10 +2348,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             end
         end
 
-        if ColorPickerWindow.Visible then
-            ColorPickerWindow.Visible = false
-            activeColorPicker = nil
-            activeColorDrag = nil
+        if ColorPicker.Window.Visible then
+            ColorPicker.Close()
         end
 
         if SettingsPopup and SettingsPopup.Visible then
@@ -2388,7 +2447,7 @@ UserInputService.InputChanged:Connect(function(input)
                 end
             end
 
-            if ColorPickerWindow.Visible and isInside(mx, my, ColorPickerWindow) then
+            if ColorPicker.Window.Visible and isInside(mx, my, ColorPicker.Window) then
                 anyInteractiveHovered = true
             end
         end
@@ -2400,24 +2459,8 @@ UserInputService.InputChanged:Connect(function(input)
             end)
         end
 
-        if activeColorDrag then
-            if activeColorDrag == "SV" then
-                local svPos = SVCanvas.AbsolutePosition
-                local svSize = SVCanvas.AbsoluteSize
-                curS = math.clamp((mx - svPos.X) / svSize.X, 0, 1)
-                curV = 1 - math.clamp((my - svPos.Y) / svSize.Y, 0, 1)
-                syncColorPickerUI()
-            elseif activeColorDrag == "HUE" then
-                local hPos = HueBar.AbsolutePosition
-                local hSize = HueBar.AbsoluteSize
-                curH = math.clamp((mx - hPos.X) / hSize.X, 0, 1)
-                syncColorPickerUI()
-            elseif activeColorDrag == "ALPHA" then
-                local aPos = AlphaBar.AbsolutePosition
-                local aSize = AlphaBar.AbsoluteSize
-                curA = math.clamp((mx - aPos.X) / aSize.X, 0, 1)
-                syncColorPickerUI()
-            end
+        if ColorPicker.HandleDrag(mx, my) then
+            -- Drag updated
         elseif activeSlider then
             activeSlider.update(input.Position.X)
         elseif isDraggingWM then
@@ -2467,7 +2510,7 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
         isDraggingWM = false
         isDraggingKB = false
         activeSlider = nil
-        activeColorDrag = nil
+        ColorPicker.EndDrag()
     elseif not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
         -- Handle Release for Hold mode keybinds
         for _, item in ipairs(rightClickRegistry) do
@@ -2497,7 +2540,7 @@ local function isCursorOverMenu()
     if keybindsEnabled and KeybindsFrame.Visible and isInside(curX, curY, KeybindsFrame) then
         return true
     end
-    if ColorPickerWindow.Visible and isInside(curX, curY, ColorPickerWindow) then
+    if ColorPicker and ColorPicker.Window.Visible and isInside(curX, curY, ColorPicker.Window) then
         return true
     end
     return isDragging or isDraggingWM or isDraggingKB
@@ -2512,7 +2555,7 @@ local headerStatsTimer = 0
 -- RenderStepped: Handles Watermark Stats update (0.5s), Snappy & Smooth Dragging, and Background Tool Protection
 RunService.RenderStepped:Connect(function(dt)
     -- 0. Header Live Metrics (Session Playtime & Client RAM)
-    headerStatsTimer += dt
+    headerStatsTimer = headerStatsTimer + dt
     if headerStatsTimer >= 0.5 then
         headerStatsTimer = 0
         if MainFrame.Visible and menuOpen then
@@ -2535,8 +2578,9 @@ RunService.RenderStepped:Connect(function(dt)
 
     -- 1. Watermark Realtime Stats (FPS, Ping, Clock)
     if WatermarkFrame.Visible then
-        fpsFrames += 1
-        fpsTimer += dt
+        -- 1. Watermark Live Metrics (FPS & Ping)
+        fpsFrames = fpsFrames + 1
+        fpsTimer = fpsTimer + dt
         if fpsTimer >= 0.5 then
             local currentFPS = math.floor(fpsFrames / fpsTimer)
             WFPSText.Text = tostring(currentFPS) .. " fps"
@@ -2707,7 +2751,7 @@ end
     local activeTab = nil
 
     function Window:CreateTab(tabName, customIcon)
-        tabCount += 1
+        tabCount = tabCount + 1
         local tabIndex = tabCount
 
         local iconAsset = resolveIcon(customIcon, tabName)
@@ -3315,7 +3359,7 @@ end
                         table.insert(clickableRegistry, {
                             object = SwatchBtn,
                             onClick = function()
-                                openColorPicker(SwatchBtn, SwatchColor, curC, curA, function(newC, newA)
+                                ColorPicker.Open(SwatchBtn, SwatchColor, curC, curA, function(newC, newA)
                                     curC = newC
                                     curA = newA
                                     pcall(cb, curC, curA)
@@ -3834,7 +3878,7 @@ end
                 table.insert(clickableRegistry, {
                     object = SwatchBtn,
                     onClick = function()
-                        openColorPicker(SwatchBtn, SwatchColor, curC, curA, onColorChanged)
+                        ColorPicker.Open(SwatchBtn, SwatchColor, curC, curA, onColorChanged)
                     end,
                     onHover = function(isHovered)
                         TweenService:Create(Label, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
@@ -3864,7 +3908,7 @@ end
         end
 
         function Tab:CreateColumn(colTitle, side, customIcon)
-            colCount += 1
+            colCount = colCount + 1
             local targetScroll = LeftScroll
             if side == "right" or (side == nil and colCount % 2 == 0) then
                 targetScroll = RightScroll
@@ -4081,7 +4125,7 @@ end
             local subColCount = 0
 
             function SubTab:CreateColumn(colTitle, side, customIcon)
-                subColCount += 1
+                subColCount = subColCount + 1
                 local target = SubLeftScroll
                 if side == "right" or (side == nil and subColCount % 2 == 0) then
                     target = SubRightScroll
