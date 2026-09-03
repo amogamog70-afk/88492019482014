@@ -2333,9 +2333,15 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                     isListeningKeybind = false
                     updateContextMenuUI()
 
+                    local sp = item.switch and item.switch.AbsolutePosition or item.object.AbsolutePosition
+                    local ss = item.switch and item.switch.AbsoluteSize or item.object.AbsoluteSize
                     local vp = getViewportSize()
-                    local targetX = math.clamp(clickX, 0, vp.X - 145)
-                    local targetY = math.clamp(clickY, 0, vp.Y - 140)
+                    local targetX = sp.X - 145
+                    if targetX < 10 then
+                        targetX = sp.X + ss.X + 8
+                    end
+                    targetX = math.clamp(targetX, 10, math.max(10, vp.X - 145))
+                    local targetY = math.clamp(sp.Y - 10, 10, math.max(10, vp.Y - 140))
                     ContextMenu.Position = UDim2.fromOffset(targetX, targetY)
                     ContextMenu.Visible = true
                     return
@@ -3217,6 +3223,15 @@ end
                 Switch.ZIndex = 25
                 Switch.Parent = Row
 
+                local SwitchHitbox = Instance.new("Frame")
+                SwitchHitbox.Name = "SwitchHitbox"
+                SwitchHitbox.Active = false
+                SwitchHitbox.Size = UDim2.new(0, 38, 1, 0)
+                SwitchHitbox.Position = UDim2.new(1, -38, 0, 0)
+                SwitchHitbox.BackgroundTransparency = 1
+                SwitchHitbox.ZIndex = 27
+                SwitchHitbox.Parent = Row
+
                 local SwitchStroke = Instance.new("UIStroke")
                 SwitchStroke.Thickness = 1
                 SwitchStroke.Color = Color3.fromRGB(50, 54, 66)
@@ -3305,7 +3320,8 @@ end
                 local function registerRightClick()
                     table.insert(rightClickRegistry, {
                         id = toggleId,
-                        object = Row,
+                        object = SwitchHitbox,
+                        switch = Switch,
                         name = toggleName,
                         resetKeybind = resetKeybind,
                         getMode = function() return mode end,
@@ -3704,12 +3720,18 @@ end
                     pcall(callback, curVal)
                 end
 
+                local TrackHitbox = Instance.new("Frame")
+                TrackHitbox.Name = "TrackHitbox"
+                TrackHitbox.Active = false
+                TrackHitbox.Size = UDim2.new(1, 0, 0, 16)
+                TrackHitbox.Position = UDim2.new(0, 0, 0, 21)
+                TrackHitbox.BackgroundTransparency = 1
+                TrackHitbox.ZIndex = 28
+                TrackHitbox.Parent = Row
+
                 table.insert(clickableRegistry, {
-                    object = Row,
+                    object = TrackHitbox,
                     onHover = function(isHovered)
-                        TweenService:Create(Label, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(215, 220, 230)
-                        }):Play()
                         TweenService:Create(TrackStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
                             Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
                         }):Play()
@@ -3717,6 +3739,11 @@ end
                             Color = isHovered and Color3.fromRGB(85, 92, 114) or Color3.fromRGB(60, 64, 76)
                         }):Play()
                     end
+                })
+
+                table.insert(sliderRegistry, {
+                    hitbox = TrackHitbox,
+                    update = updateSlider
                 })
 
                 table.insert(clickableRegistry, {
@@ -3750,10 +3777,6 @@ end
                     end
                 end)
 
-                table.insert(sliderRegistry, {
-                    hitbox = Row,
-                    update = updateSlider
-                })
 
                 return {
                     Set = function(self, v) setSlider(v) end,
