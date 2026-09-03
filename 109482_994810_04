@@ -837,6 +837,24 @@ ThreeDotsIcon.TextXAlignment = Enum.TextXAlignment.Center
 ThreeDotsIcon.TextYAlignment = Enum.TextYAlignment.Center
 ThreeDotsIcon.Parent = ThreeDotsBtn
 
+table.insert(clickableRegistry, {
+    object = ThreeDotsBtn,
+    onClick = function()
+        SettingsPopup.Visible = not SettingsPopup.Visible
+    end,
+    onHover = function(isHovered)
+        TweenService:Create(ThreeDotsBtn, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+            BackgroundColor3 = isHovered and Color3.fromRGB(36, 36, 44) or Color3.fromRGB(28, 28, 32)
+        }):Play()
+        TweenService:Create(ThreeDotsStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+            Color = isHovered and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(44, 44, 52)
+        }):Play()
+        TweenService:Create(ThreeDotsIcon, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+            TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 185, 200)
+        }):Play()
+    end
+})
+
 -- Player Avatar Box (Fixed 32x32px)
 local AvatarFrame = Instance.new("Frame")
 AvatarFrame.Name = "AvatarFrame"
@@ -1202,6 +1220,16 @@ local function toggleMenu(show)
         isDragging = false
         activeScaleTween = TweenService:Create(MainScale, TweenInfo.new(0.14, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Scale = 0.96})
         activeScaleTween:Play()
+
+        -- Reset all hover states when closing menu
+        for _, item in ipairs(clickableRegistry) do
+            if item._isHovered then
+                item._isHovered = false
+                if item.onHover then
+                    pcall(item.onHover, false)
+                end
+            end
+        end
 
         task.delay(0.14, function()
             if not menuOpen then
@@ -1664,6 +1692,23 @@ end)
 
 UserInputService.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement then
+        local mousePos = input.Position
+        local mx = mousePos.X
+        local my = mousePos.Y
+
+        -- Neverlose-style dynamic smooth hover reactions (Zero-GPE)
+        if MainFrame.Visible and menuOpen then
+            for _, item in ipairs(clickableRegistry) do
+                if item.onHover and item.object then
+                    local isHov = isInside(mx, my, item.object)
+                    if item._isHovered ~= isHov then
+                        item._isHovered = isHov
+                        pcall(item.onHover, isHov)
+                    end
+                end
+            end
+        end
+
         if activeSlider then
             activeSlider.update(input.Position.X)
         elseif isDraggingWM then
@@ -2126,7 +2171,25 @@ end
 
         table.insert(clickableRegistry, {
             object = TabBtn,
-            onClick = selectTab
+            onClick = selectTab,
+            onHover = function(isHovered)
+                if activeTab ~= tabEntry then
+                    TweenService:Create(TabBtn, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                        BackgroundTransparency = isHovered and 0.6 or 1
+                    }):Play()
+                    TweenService:Create(TabStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                        Transparency = isHovered and 0.5 or 1
+                    }):Play()
+                    TweenService:Create(TabTitle, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                        TextColor3 = isHovered and Color3.fromRGB(235, 240, 255) or Color3.fromRGB(130, 135, 150)
+                    }):Play()
+                    if TabIcon then
+                        TweenService:Create(TabIcon, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            ImageColor3 = isHovered and Color3.fromRGB(220, 225, 240) or Color3.fromRGB(130, 135, 150)
+                        }):Play()
+                    end
+                end
+            end
         })
 
         if tabIndex == 1 then
@@ -2402,6 +2465,19 @@ end
                         else
                             setToggle(not state)
                         end
+                    end,
+                    onHover = function(isHovered)
+                        TweenService:Create(Label, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(215, 220, 230)
+                        }):Play()
+                        TweenService:Create(SwitchStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            Color = isHovered and (state and Color3.fromRGB(255, 110, 125) or Color3.fromRGB(80, 86, 106)) or Color3.fromRGB(50, 54, 66)
+                        }):Play()
+                        if not state then
+                            TweenService:Create(Switch, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                                BackgroundColor3 = isHovered and Color3.fromRGB(36, 36, 44) or Color3.fromRGB(28, 28, 34)
+                            }):Play()
+                        end
                     end
                 })
 
@@ -2544,6 +2620,17 @@ end
                             TweenService:Create(BtnFrame, TweenInfo.new(0.12, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(26, 26, 32)}):Play()
                         end)
                         pcall(callback)
+                    end,
+                    onHover = function(isHovered)
+                        TweenService:Create(BtnFrame, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            BackgroundColor3 = isHovered and Color3.fromRGB(34, 34, 42) or Color3.fromRGB(26, 26, 32)
+                        }):Play()
+                        TweenService:Create(BtnStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            Color = isHovered and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(44, 46, 56)
+                        }):Play()
+                        TweenService:Create(BtnLabel, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(225, 230, 240)
+                        }):Play()
                     end
                 })
 
@@ -2743,9 +2830,32 @@ end
                 end
 
                 table.insert(clickableRegistry, {
+                    object = Row,
+                    onHover = function(isHovered)
+                        TweenService:Create(Label, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(215, 220, 230)
+                        }):Play()
+                        TweenService:Create(TrackStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
+                        }):Play()
+                        TweenService:Create(ThumbStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            Color = isHovered and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(60, 64, 76)
+                        }):Play()
+                    end
+                })
+
+                table.insert(clickableRegistry, {
                     object = ValBoxFrame,
                     onClick = function()
                         ValBox:CaptureFocus()
+                    end,
+                    onHover = function(isHovered)
+                        TweenService:Create(ValBoxFrame, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            BackgroundColor3 = isHovered and Color3.fromRGB(26, 26, 32) or Color3.fromRGB(20, 20, 24)
+                        }):Play()
+                        TweenService:Create(ValBoxStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(42, 46, 56)
+                        }):Play()
                     end
                 })
 
@@ -2844,6 +2954,17 @@ end
                     object = BoxFrame,
                     onClick = function()
                         TBox:CaptureFocus()
+                    end,
+                    onHover = function(isHovered)
+                        TweenService:Create(BoxFrame, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            BackgroundColor3 = isHovered and Color3.fromRGB(30, 30, 36) or Color3.fromRGB(24, 24, 28)
+                        }):Play()
+                        TweenService:Create(BoxStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
+                        }):Play()
+                        TweenService:Create(Label, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(215, 220, 230)
+                        }):Play()
                     end
                 })
 
@@ -3039,7 +3160,25 @@ end
 
             table.insert(clickableRegistry, {
                 object = SubBtn,
-                onClick = selectSubTab
+                onClick = selectSubTab,
+                onHover = function(isHovered)
+                    if activeSubTab ~= subEntry then
+                        TweenService:Create(SubBtn, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            BackgroundTransparency = isHovered and 0.6 or 1
+                        }):Play()
+                        TweenService:Create(SubBtnStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            Transparency = isHovered and 0.5 or 1
+                        }):Play()
+                        TweenService:Create(SubBtnText, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            TextColor3 = isHovered and Color3.fromRGB(245, 245, 255) or Color3.fromRGB(130, 135, 150)
+                        }):Play()
+                        if SubIcon then
+                            TweenService:Create(SubIcon, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                                ImageColor3 = isHovered and Color3.fromRGB(230, 235, 250) or Color3.fromRGB(130, 135, 150)
+                            }):Play()
+                        end
+                    end
+                end
             })
 
             if subIndex == 1 then
