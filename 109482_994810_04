@@ -1125,7 +1125,10 @@ table.insert(clickableRegistry, {
     end
 })
 
--- Settings Option 3: Menu Key Info Row
+-- Settings Option 3: Menu Key Customization Row
+local menuKey = Enum.KeyCode.RightShift
+local isListeningMenuKey = false
+
 local KeybindRow = Instance.new("Frame")
 KeybindRow.Name = "KeybindRow"
 KeybindRow.Active = false
@@ -1138,10 +1141,10 @@ KeybindRow.Parent = SettingsPopup
 local KeybindLabel = Instance.new("TextLabel")
 KeybindLabel.Name = "KeybindLabel"
 KeybindLabel.Active = false
-KeybindLabel.Size = UDim2.new(0, 90, 0, 24)
+KeybindLabel.Size = UDim2.new(0, 85, 0, 24)
 KeybindLabel.Position = UDim2.new(0, 0, 0, 0)
 KeybindLabel.BackgroundTransparency = 1
-KeybindLabel.Font = Enum.Font.GothamMedium
+KeybindLabel.Font = ThemeFont
 KeybindLabel.Text = "Menu Key"
 KeybindLabel.TextSize = 11
 KeybindLabel.TextColor3 = Color3.fromRGB(150, 155, 170)
@@ -1153,12 +1156,16 @@ KeybindLabel.Parent = KeybindRow
 local KeybindBadge = Instance.new("Frame")
 KeybindBadge.Name = "KeybindBadge"
 KeybindBadge.Active = false
-KeybindBadge.Size = UDim2.new(0, 52, 0, 18)
-KeybindBadge.Position = UDim2.new(1, -52, 0.5, -9)
+KeybindBadge.Size = UDim2.new(0, 60, 0, 18)
+KeybindBadge.Position = UDim2.new(1, -60, 0.5, -9)
 KeybindBadge.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
 KeybindBadge.BorderSizePixel = 0
 KeybindBadge.ZIndex = 52
 KeybindBadge.Parent = KeybindRow
+
+local KeybindBadgeCorner = Instance.new("UICorner")
+KeybindBadgeCorner.CornerRadius = UDim.new(0, 3)
+KeybindBadgeCorner.Parent = KeybindBadge
 
 local KeybindBadgeStroke = Instance.new("UIStroke")
 KeybindBadgeStroke.Thickness = 1
@@ -1171,14 +1178,56 @@ KeybindBadgeText.Name = "KeybindBadgeText"
 KeybindBadgeText.Active = false
 KeybindBadgeText.Size = UDim2.new(1, 0, 1, 0)
 KeybindBadgeText.BackgroundTransparency = 1
-KeybindBadgeText.Font = Enum.Font.GothamBold
+KeybindBadgeText.Font = ThemeFontBold
 KeybindBadgeText.Text = "RShift"
-KeybindBadgeText.TextSize = 9
-KeybindBadgeText.TextColor3 = Color3.fromRGB(190, 195, 210)
+KeybindBadgeText.TextSize = 10
+KeybindBadgeText.TextColor3 = Color3.fromRGB(220, 225, 235)
 KeybindBadgeText.TextXAlignment = Enum.TextXAlignment.Center
 KeybindBadgeText.TextYAlignment = Enum.TextYAlignment.Center
 KeybindBadgeText.ZIndex = 53
 KeybindBadgeText.Parent = KeybindBadge
+
+local function updateMenuKeyUI()
+    if isListeningMenuKey then
+        KeybindBadgeText.Text = "..."
+        KeybindBadgeText.TextColor3 = Color3.fromRGB(230, 57, 70)
+        TweenService:Create(KeybindBadgeStroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+            Color = Color3.fromRGB(230, 57, 70)
+        }):Play()
+    else
+        local keyName = menuKey and (menuKey.Name == "RightShift" and "RShift" or menuKey.Name) or "None"
+        KeybindBadgeText.Text = keyName
+        KeybindBadgeText.TextColor3 = Color3.fromRGB(220, 225, 235)
+        TweenService:Create(KeybindBadgeStroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+            Color = Color3.fromRGB(44, 44, 52)
+        }):Play()
+    end
+end
+
+table.insert(clickableRegistry, {
+    object = KeybindRow,
+    onClick = function()
+        if SettingsPopup.Visible then
+            isListeningMenuKey = not isListeningMenuKey
+            updateMenuKeyUI()
+        end
+    end,
+    onHover = function(isHovered)
+        if SettingsPopup.Visible then
+            TweenService:Create(KeybindLabel, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 155, 170)
+            }):Play()
+            if not isListeningMenuKey then
+                TweenService:Create(KeybindBadgeStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                    Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 44, 52)
+                }):Play()
+                TweenService:Create(KeybindBadge, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                    BackgroundColor3 = isHovered and Color3.fromRGB(34, 34, 42) or Color3.fromRGB(26, 26, 32)
+                }):Play()
+            end
+        end
+    end
+})
 
 ----------------------------------------------------------------------
 -- Dynamic Viewport Screen Clamping & Smooth Dragging
@@ -1287,6 +1336,11 @@ local function toggleMenu(show)
 
         if SettingsPopup then
             SettingsPopup.Visible = false
+        end
+
+        if isListeningMenuKey then
+            isListeningMenuKey = false
+            updateMenuKeyUI()
         end
 
         if Mouse then
@@ -1655,10 +1709,18 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                     elseif isInside(clickX, clickY, KeybindsToggleRow) then
                         toggleKeybinds()
                         return
+                    elseif isInside(clickX, clickY, KeybindRow) then
+                        isListeningMenuKey = not isListeningMenuKey
+                        updateMenuKeyUI()
+                        return
                     end
                     return -- Click was inside popup body/header, absorb to keep open
                 else
                     SettingsPopup.Visible = false
+                    if isListeningMenuKey then
+                        isListeningMenuKey = false
+                        updateMenuKeyUI()
+                    end
                     if isInside(clickX, clickY, ThreeDotsBtn) then
                         return -- If clicked 3 dots while open, close it and consume click
                     end
@@ -1723,6 +1785,10 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
         if SettingsPopup and SettingsPopup.Visible then
             SettingsPopup.Visible = false
+            if isListeningMenuKey then
+                isListeningMenuKey = false
+                updateMenuKeyUI()
+            end
         end
 
         if ContextMenu.Visible then
@@ -1731,6 +1797,21 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             activeContextItem = nil
         end
     elseif not gameProcessed then
+        if isListeningMenuKey then
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                pcall(function()
+                    if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.Backspace then
+                        menuKey = nil
+                    elseif input.KeyCode ~= Enum.KeyCode.Unknown then
+                        menuKey = input.KeyCode
+                    end
+                end)
+                isListeningMenuKey = false
+                updateMenuKeyUI()
+                return
+            end
+        end
+
         if isListeningKeybind and activeContextItem then
             if input.UserInputType == Enum.UserInputType.Keyboard then
                 pcall(function()
@@ -1746,7 +1827,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             end
         end
 
-        if input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.Insert then
+        if (menuKey and input.KeyCode == menuKey) or input.KeyCode == Enum.KeyCode.Insert then
             toggleMenu()
         else
             -- Check Gameplay Keybind Triggers
