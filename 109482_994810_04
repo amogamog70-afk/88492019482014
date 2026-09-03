@@ -1,4 +1,9 @@
-
+--[[
+    DeadHub UI Library - Trident Survival Safe Edition
+    Architecture: Zero-GPE (Zero GameProcessedEvent)
+    Security: Completely passive elements, no TextButton/ImageButton, Active = false
+    Style: Classic Sharp Square / Clean Minimal 1px Outline
+]]
 
 local cloneref = cloneref or function(o) return o end
 local CoreGui = cloneref(game:GetService("CoreGui"))
@@ -663,160 +668,105 @@ Subtitle.Parent = Header
 local HeaderCfgBtn, HeaderCfgLabel, hcbArrow
 local activeConfigName = "default"
 
-do -- ====================================================================
--- Neverlose-Style Config Manager (Header Button & Full Floating Manager Window)
--- ====================================================================
+do -- CONFIG MANAGER BLOCK
 local isConfigWindowOpen = false
 local localSessionConfigs = { ["default"] = true }
 local configRows = {}
+local isDropdownOpen = false
+local autoLoadName = nil
 
--- Bulletproof Executor Workspace Directory Creator
 local function ensureFolders()
     pcall(function()
         if makefolder then
             pcall(makefolder, "DeadHub")
             pcall(makefolder, "DeadHub/Configs")
-            pcall(makefolder, "DeadHub\\Configs")
         end
     end)
 end
 
--- Bulletproof File Writer for Executor Workspace
 local function writeConfigFile(cfgName, dataStr)
     ensureFolders()
     local ok = false
-    -- Try 1: DeadHub/Configs/<name>.json
     pcall(function()
-        if writefile then
-            writefile("DeadHub/Configs/" .. cfgName .. ".json", dataStr)
-            ok = true
-        end
+        if writefile then writefile("DeadHub/Configs/" .. cfgName .. ".json", dataStr) ok = true end
     end)
-    if ok then
-        localSessionConfigs[cfgName] = true
-        return true
+    if not ok then
+        pcall(function()
+            if writefile then writefile("DeadHub/" .. cfgName .. ".json", dataStr) ok = true end
+        end)
     end
-
-    -- Try 2: DeadHub\Configs\<name>.json
-    pcall(function()
-        if writefile then
-            writefile("DeadHub\\Configs\\" .. cfgName .. ".json", dataStr)
-            ok = true
-        end
-    end)
-    if ok then
-        localSessionConfigs[cfgName] = true
-        return true
-    end
-
-    -- Try 3: DeadHub/<name>.json (flat folder fallback)
-    pcall(function()
-        if writefile then
-            writefile("DeadHub/" .. cfgName .. ".json", dataStr)
-            ok = true
-        end
-    end)
-    if ok then
-        localSessionConfigs[cfgName] = true
-        return true
-    end
-
-    return false
+    if ok then localSessionConfigs[cfgName] = true end
+    return ok
 end
 
--- Bulletproof File Reader from Executor Workspace
 local function readConfigFile(cfgName)
     local content = nil
-    local paths = {
-        "DeadHub/Configs/" .. cfgName .. ".json",
-        "DeadHub\\Configs\\" .. cfgName .. ".json",
-        "DeadHub/" .. cfgName .. ".json",
-        cfgName .. ".json"
-    }
-    for _, p in ipairs(paths) do
+    for _, p in ipairs({ "DeadHub/Configs/" .. cfgName .. ".json", "DeadHub/" .. cfgName .. ".json" }) do
         pcall(function()
-            if isfile and readfile and isfile(p) then
-                content = readfile(p)
-            elseif readfile then
-                content = readfile(p)
-            end
+            if isfile and isfile(p) then content = readfile(p) end
         end)
         if content and #content > 0 then break end
     end
     return content
 end
 
--- Bulletproof File Deleter from Executor Workspace
 local function deleteConfigFile(cfgName)
     local deleted = false
-    local paths = {
-        "DeadHub/Configs/" .. cfgName .. ".json",
-        "DeadHub\\Configs\\" .. cfgName .. ".json",
-        "DeadHub/" .. cfgName .. ".json",
-        cfgName .. ".json"
-    }
-    for _, p in ipairs(paths) do
+    for _, p in ipairs({ "DeadHub/Configs/" .. cfgName .. ".json", "DeadHub/" .. cfgName .. ".json" }) do
         pcall(function()
-            if delfile and isfile and isfile(p) then
-                delfile(p)
-                deleted = true
-            elseif delfile then
-                pcall(delfile, p)
-                deleted = true
-            end
+            if delfile and isfile and isfile(p) then delfile(p) deleted = true end
         end)
     end
     localSessionConfigs[cfgName] = nil
     return deleted
 end
 
--- Bulletproof Config Scanner from Executor Workspace
 local function getSavedConfigNames()
     ensureFolders()
-    local names = {}
-    local seen = {}
-
-    local function scanFolder(folder)
+    local names, seen = {}, {}
+    local function scan(folder)
         pcall(function()
             if listfiles then
                 for _, f in ipairs(listfiles(folder)) do
-                    local cleanName = f:match("([^/\\]+)%.json$") or f:match("([^/\\]+)$")
-                    if cleanName then
-                        cleanName = cleanName:gsub("%.json$", "")
-                        if not seen[cleanName] then
-                            seen[cleanName] = true
-                            table.insert(names, cleanName)
-                            localSessionConfigs[cleanName] = true
-                        end
-                    end
+                    local n = f:match("([^/\\]+)%.json$")
+                    if n and not seen[n] then seen[n] = true table.insert(names, n) localSessionConfigs[n] = true end
                 end
             end
         end)
     end
-
-    scanFolder("DeadHub/Configs")
-    scanFolder("DeadHub\\Configs")
-    scanFolder("DeadHub")
-
-    for k, _ in pairs(localSessionConfigs) do
-        if not seen[k] then
-            seen[k] = true
-            table.insert(names, k)
-        end
+    scan("DeadHub/Configs") scan("DeadHub")
+    for k in pairs(localSessionConfigs) do
+        if not seen[k] then seen[k] = true table.insert(names, k) end
     end
-
     table.sort(names)
-    if #names == 0 then
-        table.insert(names, "default")
-    end
+    if #names == 0 then table.insert(names, "default") end
     return names
 end
 
--- 1. Header Trigger Button (Neverlose Style Glass Button)
+local function readAutoLoad()
+    local n = nil
+    pcall(function()
+        if isfile and isfile("DeadHub/autoload.txt") then
+            n = readfile("DeadHub/autoload.txt"):match("^%s*(.-)%s*$")
+        end
+    end)
+    return (n and #n > 0) and n or nil
+end
+
+local function writeAutoLoad(name)
+    pcall(function()
+        ensureFolders()
+        if writefile then writefile("DeadHub/autoload.txt", name or "") end
+    end)
+end
+
+autoLoadName = readAutoLoad()
+
+-- Header Button
 HeaderCfgBtn = Instance.new("Frame")
 HeaderCfgBtn.Name = "HeaderCfgBtn"
 HeaderCfgBtn.Active = false
-HeaderCfgBtn.Size = UDim2.new(0, 180, 0, 26)
+HeaderCfgBtn.Size = UDim2.new(0, 168, 0, 26)
 HeaderCfgBtn.Position = UDim2.new(0, 192, 0.5, -13)
 HeaderCfgBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
 HeaderCfgBtn.BorderSizePixel = 0
@@ -833,22 +783,25 @@ hcbStroke.Color = Color3.fromRGB(44, 46, 58)
 hcbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 hcbStroke.Parent = HeaderCfgBtn
 
-local hcbIcon = Instance.new("ImageLabel")
-hcbIcon.Name = "Icon"
-hcbIcon.Active = false
-hcbIcon.Size = UDim2.new(0, 14, 0, 14)
-hcbIcon.Position = UDim2.new(0, 8, 0.5, -7)
-hcbIcon.BackgroundTransparency = 1
-hcbIcon.Image = "rbxassetid://74169124489941"
-hcbIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
-hcbIcon.ZIndex = 51
-hcbIcon.Parent = HeaderCfgBtn
+local hcbIco = Instance.new("TextLabel")
+hcbIco.Active = false
+hcbIco.Size = UDim2.new(0, 14, 1, 0)
+hcbIco.Position = UDim2.new(0, 6, 0, 0)
+hcbIco.BackgroundTransparency = 1
+hcbIco.Font = ThemeFontBold
+hcbIco.Text = ">"
+hcbIco.TextSize = 11
+hcbIco.TextColor3 = Color3.fromRGB(230, 57, 70)
+hcbIco.TextXAlignment = Enum.TextXAlignment.Center
+hcbIco.TextYAlignment = Enum.TextYAlignment.Center
+hcbIco.ZIndex = 51
+hcbIco.Parent = HeaderCfgBtn
 
 HeaderCfgLabel = Instance.new("TextLabel")
 HeaderCfgLabel.Name = "Label"
 HeaderCfgLabel.Active = false
-HeaderCfgLabel.Size = UDim2.new(1, -48, 1, 0)
-HeaderCfgLabel.Position = UDim2.new(0, 26, 0, 0)
+HeaderCfgLabel.Size = UDim2.new(1, -42, 1, 0)
+HeaderCfgLabel.Position = UDim2.new(0, 24, 0, 0)
 HeaderCfgLabel.BackgroundTransparency = 1
 HeaderCfgLabel.Font = ThemeFontBold
 HeaderCfgLabel.Text = "Config: " .. activeConfigName
@@ -875,542 +828,339 @@ hcbArrow.TextYAlignment = Enum.TextYAlignment.Center
 hcbArrow.ZIndex = 51
 hcbArrow.Parent = HeaderCfgBtn
 
--- 2. Neverlose Floating Config Manager Window (Spacious, Beautiful & High Contrast)
+-- Floating Config Window (300 x 280)
 local ConfigWindow = Instance.new("Frame")
 ConfigWindow.Name = "DH_ConfigManagerWindow"
 ConfigWindow.Active = false
 ConfigWindow.Visible = false
-ConfigWindow.Size = UDim2.new(0, 320, 0, 375)
-ConfigWindow.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+ConfigWindow.Size = UDim2.new(0, 300, 0, 280)
+ConfigWindow.BackgroundColor3 = Color3.fromRGB(17, 17, 22)
 ConfigWindow.BorderSizePixel = 0
 ConfigWindow.ZIndex = 600
-ConfigWindow.ClipsDescendants = true
+ConfigWindow.ClipsDescendants = false
 ConfigWindow.Parent = ScreenGui
 
 local cwCorner = Instance.new("UICorner")
-cwCorner.CornerRadius = UDim.new(0, 5)
+cwCorner.CornerRadius = UDim.new(0, 6)
 cwCorner.Parent = ConfigWindow
 
 local cwStroke = Instance.new("UIStroke")
 cwStroke.Thickness = 1
-cwStroke.Color = Color3.fromRGB(44, 46, 58)
+cwStroke.Color = Color3.fromRGB(42, 44, 56)
 cwStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 cwStroke.Parent = ConfigWindow
 
--- Modal Header
+-- Header
 local CwHeader = Instance.new("Frame")
-CwHeader.Name = "Header"
+CwHeader.Name = "CwHeader"
 CwHeader.Active = false
-CwHeader.Size = UDim2.new(1, 0, 0, 32)
-CwHeader.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+CwHeader.Size = UDim2.new(1, 0, 0, 34)
+CwHeader.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
 CwHeader.BorderSizePixel = 0
 CwHeader.ZIndex = 601
 CwHeader.Parent = ConfigWindow
 
-local cwHeadTitle = Instance.new("TextLabel")
-cwHeadTitle.Name = "Title"
-cwHeadTitle.Active = false
-cwHeadTitle.Size = UDim2.new(1, -40, 1, 0)
-cwHeadTitle.Position = UDim2.new(0, 12, 0, 0)
-cwHeadTitle.BackgroundTransparency = 1
-cwHeadTitle.Font = ThemeFontBold
-cwHeadTitle.RichText = true
-cwHeadTitle.Text = '<font color="#e63946">CONFIG</font> MANAGER'
-cwHeadTitle.TextSize = 11
-cwHeadTitle.TextColor3 = Color3.fromRGB(240, 240, 250)
-cwHeadTitle.TextXAlignment = Enum.TextXAlignment.Left
-cwHeadTitle.TextYAlignment = Enum.TextYAlignment.Center
-cwHeadTitle.ZIndex = 602
-cwHeadTitle.Parent = CwHeader
+local cwHdrCorner = Instance.new("UICorner")
+cwHdrCorner.CornerRadius = UDim.new(0, 6)
+cwHdrCorner.Parent = CwHeader
+
+local cwHdrSqFix = Instance.new("Frame")
+cwHdrSqFix.Active = false
+cwHdrSqFix.Size = UDim2.new(1, 0, 0.5, 0)
+cwHdrSqFix.Position = UDim2.new(0, 0, 0.5, 0)
+cwHdrSqFix.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
+cwHdrSqFix.BorderSizePixel = 0
+cwHdrSqFix.ZIndex = 601
+cwHdrSqFix.Parent = CwHeader
+
+local cwHdrDiv = Instance.new("Frame")
+cwHdrDiv.Active = false
+cwHdrDiv.Size = UDim2.new(1, 0, 0, 1)
+cwHdrDiv.Position = UDim2.new(0, 0, 1, -1)
+cwHdrDiv.BackgroundColor3 = Color3.fromRGB(34, 36, 46)
+cwHdrDiv.BorderSizePixel = 0
+cwHdrDiv.ZIndex = 602
+cwHdrDiv.Parent = CwHeader
+
+local cwTitle = Instance.new("TextLabel")
+cwTitle.Active = false
+cwTitle.Size = UDim2.new(1, -12, 1, 0)
+cwTitle.Position = UDim2.new(0, 12, 0, 0)
+cwTitle.BackgroundTransparency = 1
+cwTitle.Font = ThemeFontBold
+cwTitle.RichText = true
+cwTitle.Text = '<font color="#e63946">CONFIG</font> MANAGER'
+cwTitle.TextSize = 11
+cwTitle.TextColor3 = Color3.fromRGB(240, 240, 250)
+cwTitle.TextXAlignment = Enum.TextXAlignment.Left
+cwTitle.TextYAlignment = Enum.TextYAlignment.Center
+cwTitle.ZIndex = 602
+cwTitle.Parent = CwHeader
 
 local CwCloseBtn = Instance.new("TextLabel")
 CwCloseBtn.Name = "CloseBtn"
 CwCloseBtn.Active = false
-CwCloseBtn.Size = UDim2.new(0, 24, 0, 24)
-CwCloseBtn.Position = UDim2.new(1, -28, 0.5, -12)
+CwCloseBtn.Size = UDim2.new(0, 28, 1, 0)
+CwCloseBtn.Position = UDim2.new(1, -30, 0, 0)
 CwCloseBtn.BackgroundTransparency = 1
 CwCloseBtn.Font = ThemeFontBold
 CwCloseBtn.Text = "x"
 CwCloseBtn.TextSize = 13
-CwCloseBtn.TextColor3 = Color3.fromRGB(150, 155, 170)
+CwCloseBtn.TextColor3 = Color3.fromRGB(130, 135, 155)
 CwCloseBtn.TextXAlignment = Enum.TextXAlignment.Center
 CwCloseBtn.TextYAlignment = Enum.TextYAlignment.Center
 CwCloseBtn.ZIndex = 602
 CwCloseBtn.Parent = CwHeader
 
-local cwHeadDiv = Instance.new("Frame")
-cwHeadDiv.Name = "Div"
-cwHeadDiv.Active = false
-cwHeadDiv.Size = UDim2.new(1, 0, 0, 1)
-cwHeadDiv.Position = UDim2.new(0, 0, 1, -1)
-cwHeadDiv.BackgroundColor3 = Color3.fromRGB(36, 38, 48)
-cwHeadDiv.BorderSizePixel = 0
-cwHeadDiv.ZIndex = 602
-cwHeadDiv.Parent = CwHeader
+-- TextBox + Dropdown combo (y=42)
+local ComboFrame = Instance.new("Frame")
+ComboFrame.Name = "ComboFrame"
+ComboFrame.Active = false
+ComboFrame.Size = UDim2.new(1, -20, 0, 30)
+ComboFrame.Position = UDim2.new(0, 10, 0, 42)
+ComboFrame.BackgroundColor3 = Color3.fromRGB(14, 14, 18)
+ComboFrame.BorderSizePixel = 0
+ComboFrame.ZIndex = 601
+ComboFrame.Parent = ConfigWindow
 
--- Section 1: Config Name Input & Save Button
-local NameInputLabel = Instance.new("TextLabel")
-NameInputLabel.Name = "NameLabel"
-NameInputLabel.Active = false
-NameInputLabel.Size = UDim2.new(1, -24, 0, 14)
-NameInputLabel.Position = UDim2.new(0, 12, 0, 38)
-NameInputLabel.BackgroundTransparency = 1
-NameInputLabel.Font = ThemeFontBold
-NameInputLabel.Text = "CONFIG NAME"
-NameInputLabel.TextSize = 9
-NameInputLabel.TextColor3 = Color3.fromRGB(130, 135, 150)
-NameInputLabel.TextXAlignment = Enum.TextXAlignment.Left
-NameInputLabel.ZIndex = 601
-NameInputLabel.Parent = ConfigWindow
+local comboCorner = Instance.new("UICorner")
+comboCorner.CornerRadius = UDim.new(0, 4)
+comboCorner.Parent = ComboFrame
 
-local InputRow = Instance.new("Frame")
-InputRow.Name = "InputRow"
-InputRow.Active = false
-InputRow.Size = UDim2.new(1, -24, 0, 26)
-InputRow.Position = UDim2.new(0, 12, 0, 54)
-InputRow.BackgroundTransparency = 1
-InputRow.ZIndex = 601
-InputRow.Parent = ConfigWindow
-
-local CfgInputFrame = Instance.new("Frame")
-CfgInputFrame.Name = "InputBox"
-CfgInputFrame.Active = false
-CfgInputFrame.Size = UDim2.new(1, -95, 1, 0)
-CfgInputFrame.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
-CfgInputFrame.BorderSizePixel = 0
-CfgInputFrame.ZIndex = 602
-CfgInputFrame.Parent = InputRow
-
-local cifCorner = Instance.new("UICorner")
-cifCorner.CornerRadius = UDim.new(0, 4)
-cifCorner.Parent = CfgInputFrame
-
-local cifStroke = Instance.new("UIStroke")
-cifStroke.Thickness = 1
-cifStroke.Color = Color3.fromRGB(44, 46, 58)
-cifStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-cifStroke.Parent = CfgInputFrame
+local comboStroke = Instance.new("UIStroke")
+comboStroke.Thickness = 1
+comboStroke.Color = Color3.fromRGB(44, 46, 58)
+comboStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+comboStroke.Parent = ComboFrame
 
 local ConfigInput = Instance.new("TextBox")
-ConfigInput.Name = "TextBox"
+ConfigInput.Name = "ConfigInput"
 ConfigInput.Active = true
-ConfigInput.Size = UDim2.new(1, -12, 1, 0)
-ConfigInput.Position = UDim2.new(0, 6, 0, 0)
+ConfigInput.Size = UDim2.new(1, -32, 1, 0)
+ConfigInput.Position = UDim2.new(0, 8, 0, 0)
 ConfigInput.BackgroundTransparency = 1
 ConfigInput.Font = ThemeFont
-ConfigInput.PlaceholderText = "Enter config name..."
-ConfigInput.PlaceholderColor3 = Color3.fromRGB(115, 120, 135)
+ConfigInput.PlaceholderText = "Config name..."
+ConfigInput.PlaceholderColor3 = Color3.fromRGB(85, 90, 108)
 ConfigInput.Text = activeConfigName
 ConfigInput.TextSize = 11
-ConfigInput.TextColor3 = Color3.fromRGB(240, 240, 250)
+ConfigInput.TextColor3 = Color3.fromRGB(235, 238, 248)
 ConfigInput.TextXAlignment = Enum.TextXAlignment.Left
 ConfigInput.ClearTextOnFocus = false
 ConfigInput.ZIndex = 603
-ConfigInput.Parent = CfgInputFrame
+ConfigInput.Parent = ComboFrame
 
-local SaveBtn = Instance.new("Frame")
-SaveBtn.Name = "SaveBtn"
-SaveBtn.Active = false
-SaveBtn.Size = UDim2.new(0, 90, 1, 0)
-SaveBtn.Position = UDim2.new(1, -90, 0, 0)
-SaveBtn.BackgroundColor3 = Color3.fromRGB(22, 32, 24)
-SaveBtn.BorderSizePixel = 0
-SaveBtn.ZIndex = 602
-SaveBtn.Parent = InputRow
+local DropArrowBtn = Instance.new("Frame")
+DropArrowBtn.Name = "DropArrow"
+DropArrowBtn.Active = false
+DropArrowBtn.Size = UDim2.new(0, 26, 1, 0)
+DropArrowBtn.Position = UDim2.new(1, -26, 0, 0)
+DropArrowBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+DropArrowBtn.BorderSizePixel = 0
+DropArrowBtn.ZIndex = 603
+DropArrowBtn.Parent = ComboFrame
 
-local sbCorner = Instance.new("UICorner")
-sbCorner.CornerRadius = UDim.new(0, 4)
-sbCorner.Parent = SaveBtn
+local dropArrowLDiv = Instance.new("Frame")
+dropArrowLDiv.Active = false
+dropArrowLDiv.Size = UDim2.new(0, 1, 1, -8)
+dropArrowLDiv.Position = UDim2.new(0, 0, 0, 4)
+dropArrowLDiv.BackgroundColor3 = Color3.fromRGB(38, 40, 52)
+dropArrowLDiv.BorderSizePixel = 0
+dropArrowLDiv.ZIndex = 604
+dropArrowLDiv.Parent = DropArrowBtn
 
-local sbStroke = Instance.new("UIStroke")
-sbStroke.Thickness = 1
-sbStroke.Color = Color3.fromRGB(46, 76, 52)
-sbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-sbStroke.Parent = SaveBtn
+local comboArrow = Instance.new("TextLabel")
+comboArrow.Active = false
+comboArrow.Size = UDim2.new(1, 0, 1, 0)
+comboArrow.BackgroundTransparency = 1
+comboArrow.Font = ThemeFontBold
+comboArrow.Text = "v"
+comboArrow.TextSize = 9
+comboArrow.TextColor3 = Color3.fromRGB(170, 175, 195)
+comboArrow.TextXAlignment = Enum.TextXAlignment.Center
+comboArrow.TextYAlignment = Enum.TextYAlignment.Center
+comboArrow.ZIndex = 604
+comboArrow.Parent = DropArrowBtn
 
-local sbIcon = Instance.new("ImageLabel")
-sbIcon.Name = "Icon"
-sbIcon.Active = false
-sbIcon.Size = UDim2.new(0, 13, 0, 13)
-sbIcon.Position = UDim2.new(0, 8, 0.5, -6.5)
-sbIcon.BackgroundTransparency = 1
-sbIcon.Image = "rbxassetid://74169124489941"
-sbIcon.ImageColor3 = Color3.fromRGB(80, 210, 120)
-sbIcon.ZIndex = 603
-sbIcon.Parent = SaveBtn
+-- Dropdown list (y=75, overlays rest)
+local DropList = Instance.new("ScrollingFrame")
+DropList.Name = "DropList"
+DropList.Active = false
+DropList.Visible = false
+DropList.Size = UDim2.new(1, -20, 0, 110)
+DropList.Position = UDim2.new(0, 10, 0, 75)
+DropList.BackgroundColor3 = Color3.fromRGB(14, 14, 19)
+DropList.BorderSizePixel = 0
+DropList.ScrollBarThickness = 2
+DropList.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
+DropList.ClipsDescendants = true
+DropList.ZIndex = 620
+DropList.Parent = ConfigWindow
 
-local sbText = Instance.new("TextLabel")
-sbText.Name = "Text"
-sbText.Active = false
-sbText.Size = UDim2.new(1, -24, 1, 0)
-sbText.Position = UDim2.new(0, 22, 0, 0)
-sbText.BackgroundTransparency = 1
-sbText.Font = ThemeFontBold
-sbText.Text = "Save to PC"
-sbText.TextSize = 10
-sbText.TextColor3 = Color3.fromRGB(210, 240, 215)
-sbText.TextXAlignment = Enum.TextXAlignment.Left
-sbText.TextYAlignment = Enum.TextYAlignment.Center
-sbText.ZIndex = 603
-sbText.Parent = SaveBtn
+local dlCorner = Instance.new("UICorner")
+dlCorner.CornerRadius = UDim.new(0, 4)
+dlCorner.Parent = DropList
 
--- Section 2: Saved Configs List
-local ListSectionTitle = Instance.new("TextLabel")
-ListSectionTitle.Name = "ListSectionTitle"
-ListSectionTitle.Active = false
-ListSectionTitle.Size = UDim2.new(1, -24, 0, 14)
-ListSectionTitle.Position = UDim2.new(0, 12, 0, 88)
-ListSectionTitle.BackgroundTransparency = 1
-ListSectionTitle.Font = ThemeFontBold
-ListSectionTitle.Text = "SAVED CONFIGS (PC DISK)"
-ListSectionTitle.TextSize = 9
-ListSectionTitle.TextColor3 = Color3.fromRGB(130, 135, 150)
-ListSectionTitle.TextXAlignment = Enum.TextXAlignment.Left
-ListSectionTitle.ZIndex = 601
-ListSectionTitle.Parent = ConfigWindow
+local dlStroke = Instance.new("UIStroke")
+dlStroke.Thickness = 1
+dlStroke.Color = Color3.fromRGB(42, 44, 56)
+dlStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+dlStroke.Parent = DropList
 
-local ConfigScroll = Instance.new("ScrollingFrame")
-ConfigScroll.Name = "ConfigScroll"
-ConfigScroll.Active = false
-ConfigScroll.Size = UDim2.new(1, -24, 0, 185)
-ConfigScroll.Position = UDim2.new(0, 12, 0, 104)
-ConfigScroll.BackgroundColor3 = Color3.fromRGB(14, 14, 18)
-ConfigScroll.BorderSizePixel = 0
-ConfigScroll.ScrollBarThickness = 3
-ConfigScroll.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
-ConfigScroll.ClipsDescendants = true
-ConfigScroll.ZIndex = 601
-ConfigScroll.Parent = ConfigWindow
+local dlLayout = Instance.new("UIListLayout")
+dlLayout.FillDirection = Enum.FillDirection.Vertical
+dlLayout.SortOrder = Enum.SortOrder.LayoutOrder
+dlLayout.Padding = UDim.new(0, 2)
+dlLayout.Parent = DropList
 
-local csCorner2 = Instance.new("UICorner")
-csCorner2.CornerRadius = UDim.new(0, 4)
-csCorner2.Parent = ConfigScroll
+local dlPad = Instance.new("UIPadding")
+dlPad.PaddingTop = UDim.new(0, 3)
+dlPad.PaddingBottom = UDim.new(0, 3)
+dlPad.PaddingLeft = UDim.new(0, 3)
+dlPad.PaddingRight = UDim.new(0, 3)
+dlPad.Parent = DropList
 
-local csStroke2 = Instance.new("UIStroke")
-csStroke2.Thickness = 1
-csStroke2.Color = Color3.fromRGB(36, 38, 48)
-csStroke2.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-csStroke2.Parent = ConfigScroll
+local dropRows = {}
 
-local csLayout = Instance.new("UIListLayout")
-csLayout.FillDirection = Enum.FillDirection.Vertical
-csLayout.SortOrder = Enum.SortOrder.LayoutOrder
-csLayout.Padding = UDim.new(0, 3)
-csLayout.Parent = ConfigScroll
+-- 4 Buttons (2x2 grid, y=190)
+local BtnGrid = Instance.new("Frame")
+BtnGrid.Name = "BtnGrid"
+BtnGrid.Active = false
+BtnGrid.Size = UDim2.new(1, -20, 0, 64)
+BtnGrid.Position = UDim2.new(0, 10, 0, 190)
+BtnGrid.BackgroundTransparency = 1
+BtnGrid.ZIndex = 601
+BtnGrid.Parent = ConfigWindow
 
-local csPad = Instance.new("UIPadding")
-csPad.PaddingTop = UDim.new(0, 4)
-csPad.PaddingBottom = UDim.new(0, 4)
-csPad.PaddingLeft = UDim.new(0, 4)
-csPad.PaddingRight = UDim.new(0, 4)
-csPad.Parent = ConfigScroll
+local function makeBtn2(parent, cx, cy, label, iconCh, bgColor, strokeColor, iconColor)
+    local f = Instance.new("Frame")
+    f.Active = false
+    f.Size = UDim2.new(0.5, cx > 0 and -2 or -2, 0.5, cy > 0 and -2 or -2)
+    f.Position = UDim2.new(cx > 0 and 0.5 or 0, cx > 0 and 2 or 0, cy > 0 and 0.5 or 0, cy > 0 and 2 or 0)
+    f.BackgroundColor3 = bgColor
+    f.BorderSizePixel = 0
+    f.ZIndex = 602
+    f.Parent = parent
+    local bc = Instance.new("UICorner") bc.CornerRadius = UDim.new(0, 4) bc.Parent = f
+    local bs = Instance.new("UIStroke") bs.Thickness = 1 bs.Color = strokeColor
+    bs.ApplyStrokeMode = Enum.ApplyStrokeMode.Border bs.Parent = f
+    local bi = Instance.new("TextLabel") bi.Active = false bi.Size = UDim2.new(0, 18, 1, 0)
+    bi.Position = UDim2.new(0, 6, 0, 0) bi.BackgroundTransparency = 1 bi.Font = ThemeFontBold
+    bi.Text = iconCh bi.TextSize = 12 bi.TextColor3 = iconColor bi.TextXAlignment = Enum.TextXAlignment.Center
+    bi.TextYAlignment = Enum.TextYAlignment.Center bi.ZIndex = 603 bi.Parent = f
+    local bl = Instance.new("TextLabel") bl.Active = false bl.Size = UDim2.new(1, -26, 1, 0)
+    bl.Position = UDim2.new(0, 24, 0, 0) bl.BackgroundTransparency = 1 bl.Font = ThemeFontBold
+    bl.Text = label bl.TextSize = 10 bl.TextColor3 = Color3.fromRGB(228, 232, 245) bl.TextXAlignment = Enum.TextXAlignment.Left
+    bl.TextYAlignment = Enum.TextYAlignment.Center bl.ZIndex = 603 bl.Parent = f
+    return f, bs
+end
 
--- Section 3: Bottom Action Buttons (Load, Delete, Refresh)
-local BottomActions = Instance.new("Frame")
-BottomActions.Name = "BottomActions"
-BottomActions.Active = false
-BottomActions.Size = UDim2.new(1, -24, 0, 26)
-BottomActions.Position = UDim2.new(0, 12, 0, 296)
-BottomActions.BackgroundTransparency = 1
-BottomActions.ZIndex = 601
-BottomActions.Parent = ConfigWindow
+local SaveBtn,   SaveStroke   = makeBtn2(BtnGrid, 0, 0, "Save",      "+", Color3.fromRGB(18, 28, 20), Color3.fromRGB(44, 72, 50),  Color3.fromRGB(80, 210, 120))
+local LoadBtn,   LoadStroke   = makeBtn2(BtnGrid, 1, 0, "Load",      ">", Color3.fromRGB(28, 16, 20), Color3.fromRGB(220, 55, 68), Color3.fromRGB(230, 57, 70))
+local DelBtn,    DelStroke    = makeBtn2(BtnGrid, 0, 1, "Delete",    "x", Color3.fromRGB(24, 15, 17), Color3.fromRGB(76, 38, 42),  Color3.fromRGB(210, 78, 78))
+local AutoBtn,   AutoStroke   = makeBtn2(BtnGrid, 1, 1, "Auto-load", "A", Color3.fromRGB(16, 16, 24), Color3.fromRGB(42, 44, 58),  Color3.fromRGB(130, 135, 160))
 
-local baLayout = Instance.new("UIListLayout")
-baLayout.FillDirection = Enum.FillDirection.Horizontal
-baLayout.SortOrder = Enum.SortOrder.LayoutOrder
-baLayout.Padding = UDim.new(0, 6)
-baLayout.Parent = BottomActions
+local autoDot = Instance.new("Frame")
+autoDot.Active = false
+autoDot.Size = UDim2.new(0, 5, 0, 5)
+autoDot.Position = UDim2.new(1, -8, 0, 6)
+autoDot.BackgroundColor3 = autoLoadName and Color3.fromRGB(80, 210, 120) or Color3.fromRGB(55, 58, 72)
+autoDot.BorderSizePixel = 0
+autoDot.ZIndex = 604
+autoDot.Parent = AutoBtn
 
-local LoadBtn = Instance.new("Frame")
-LoadBtn.Name = "LoadBtn"
-LoadBtn.Active = false
-LoadBtn.Size = UDim2.new(0, 110, 1, 0)
-LoadBtn.BackgroundColor3 = Color3.fromRGB(34, 18, 22)
-LoadBtn.BorderSizePixel = 0
-LoadBtn.ZIndex = 602
-LoadBtn.Parent = BottomActions
+local autoDotCorner = Instance.new("UICorner")
+autoDotCorner.CornerRadius = UDim.new(0, 3)
+autoDotCorner.Parent = autoDot
 
-local lbCorner = Instance.new("UICorner")
-lbCorner.CornerRadius = UDim.new(0, 4)
-lbCorner.Parent = LoadBtn
-
-local lbStroke = Instance.new("UIStroke")
-lbStroke.Thickness = 1
-lbStroke.Color = Color3.fromRGB(230, 57, 70)
-lbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-lbStroke.Parent = LoadBtn
-
-local lbIcon = Instance.new("ImageLabel")
-lbIcon.Name = "Icon"
-lbIcon.Active = false
-lbIcon.Size = UDim2.new(0, 13, 0, 13)
-lbIcon.Position = UDim2.new(0, 8, 0.5, -6.5)
-lbIcon.BackgroundTransparency = 1
-lbIcon.Image = "rbxassetid://77232797873154"
-lbIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
-lbIcon.ZIndex = 603
-lbIcon.Parent = LoadBtn
-
-local lbText = Instance.new("TextLabel")
-lbText.Name = "Text"
-lbText.Active = false
-lbText.Size = UDim2.new(1, -24, 1, 0)
-lbText.Position = UDim2.new(0, 24, 0, 0)
-lbText.BackgroundTransparency = 1
-lbText.Font = ThemeFontBold
-lbText.Text = "Load Config"
-lbText.TextSize = 10
-lbText.TextColor3 = Color3.fromRGB(255, 235, 240)
-lbText.TextXAlignment = Enum.TextXAlignment.Left
-lbText.TextYAlignment = Enum.TextYAlignment.Center
-lbText.ZIndex = 603
-lbText.Parent = LoadBtn
-
-local DelBtn = Instance.new("Frame")
-DelBtn.Name = "DelBtn"
-DelBtn.Active = false
-DelBtn.Size = UDim2.new(0, 86, 1, 0)
-DelBtn.BackgroundColor3 = Color3.fromRGB(28, 18, 20)
-DelBtn.BorderSizePixel = 0
-DelBtn.ZIndex = 602
-DelBtn.Parent = BottomActions
-
-local dbCorner = Instance.new("UICorner")
-dbCorner.CornerRadius = UDim.new(0, 4)
-dbCorner.Parent = DelBtn
-
-local dbStroke = Instance.new("UIStroke")
-dbStroke.Thickness = 1
-dbStroke.Color = Color3.fromRGB(60, 36, 40)
-dbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-dbStroke.Parent = DelBtn
-
-local dbIcon = Instance.new("ImageLabel")
-dbIcon.Name = "Icon"
-dbIcon.Active = false
-dbIcon.Size = UDim2.new(0, 13, 0, 13)
-dbIcon.Position = UDim2.new(0, 8, 0.5, -6.5)
-dbIcon.BackgroundTransparency = 1
-dbIcon.Image = "rbxassetid://119832272702307"
-dbIcon.ImageColor3 = Color3.fromRGB(240, 80, 80)
-dbIcon.ZIndex = 603
-dbIcon.Parent = DelBtn
-
-local dbText = Instance.new("TextLabel")
-dbText.Name = "Text"
-dbText.Active = false
-dbText.Size = UDim2.new(1, -24, 1, 0)
-dbText.Position = UDim2.new(0, 24, 0, 0)
-dbText.BackgroundTransparency = 1
-dbText.Font = ThemeFontBold
-dbText.Text = "Delete"
-dbText.TextSize = 10
-dbText.TextColor3 = Color3.fromRGB(240, 200, 205)
-dbText.TextXAlignment = Enum.TextXAlignment.Left
-dbText.TextYAlignment = Enum.TextYAlignment.Center
-dbText.ZIndex = 603
-dbText.Parent = DelBtn
-
-local RefreshBtn = Instance.new("Frame")
-RefreshBtn.Name = "RefreshBtn"
-RefreshBtn.Active = false
-RefreshBtn.Size = UDim2.new(0, 84, 1, 0)
-RefreshBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
-RefreshBtn.BorderSizePixel = 0
-RefreshBtn.ZIndex = 602
-RefreshBtn.Parent = BottomActions
-
-local rfCorner = Instance.new("UICorner")
-rfCorner.CornerRadius = UDim.new(0, 4)
-rfCorner.Parent = RefreshBtn
-
-local rfStroke = Instance.new("UIStroke")
-rfStroke.Thickness = 1
-rfStroke.Color = Color3.fromRGB(44, 46, 58)
-rfStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-rfStroke.Parent = RefreshBtn
-
-local rfText = Instance.new("TextLabel")
-rfText.Name = "Text"
-rfText.Active = false
-rfText.Size = UDim2.new(1, 0, 1, 0)
-rfText.BackgroundTransparency = 1
-rfText.Font = ThemeFontBold
-rfText.Text = "↻ Refresh"
-rfText.TextSize = 10
-rfText.TextColor3 = Color3.fromRGB(180, 185, 200)
-rfText.TextXAlignment = Enum.TextXAlignment.Center
-rfText.TextYAlignment = Enum.TextYAlignment.Center
-rfText.ZIndex = 603
-rfText.Parent = RefreshBtn
-
--- Section 4: Real-time Status Label
+-- Status bar
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Name = "StatusLabel"
 StatusLabel.Active = false
-StatusLabel.Size = UDim2.new(1, -24, 0, 28)
-StatusLabel.Position = UDim2.new(0, 12, 0, 332)
+StatusLabel.Size = UDim2.new(1, -20, 0, 20)
+StatusLabel.Position = UDim2.new(0, 10, 0, 258)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Font = ThemeFont
-StatusLabel.Text = "Ready. Configs saved to workspace/DeadHub/Configs/"
-StatusLabel.TextSize = 10
-StatusLabel.TextColor3 = Color3.fromRGB(140, 145, 160)
+StatusLabel.Text = "workspace/DeadHub/Configs/"
+StatusLabel.TextSize = 9
+StatusLabel.TextColor3 = Color3.fromRGB(95, 100, 118)
 StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 StatusLabel.TextYAlignment = Enum.TextYAlignment.Center
 StatusLabel.TextTruncate = Enum.TextTruncate.AtEnd
 StatusLabel.ZIndex = 602
 StatusLabel.Parent = ConfigWindow
 
-local selectedConfig = "default"
+-- Logic
+local selectedConfig = activeConfigName
 
-local function setStatus(msg, isSuccess)
+local function setStatus(msg, isOk)
     StatusLabel.Text = msg
-    StatusLabel.TextColor3 = isSuccess and Color3.fromRGB(100, 220, 120) or Color3.fromRGB(240, 80, 90)
+    StatusLabel.TextColor3 = isOk and Color3.fromRGB(85, 205, 105) or Color3.fromRGB(225, 78, 88)
     task.delay(4, function()
         if StatusLabel.Text == msg then
-            StatusLabel.Text = "Ready. Configs saved to workspace/DeadHub/Configs/"
-            StatusLabel.TextColor3 = Color3.fromRGB(140, 145, 160)
+            StatusLabel.Text = "workspace/DeadHub/Configs/"
+            StatusLabel.TextColor3 = Color3.fromRGB(95, 100, 118)
         end
     end)
 end
 
-local function selectConfigRow(name)
-    selectedConfig = name
-    ConfigInput.Text = name
-    for _, r in ipairs(configRows) do
-        local isSel = (r.name == name)
-        r.frame.BackgroundColor3 = isSel and Color3.fromRGB(34, 18, 22) or Color3.fromRGB(20, 20, 26)
-        r.stroke.Color = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(36, 38, 48)
-        r.dot.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(60, 64, 76)
-        r.label.TextColor3 = isSel and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(170, 175, 190)
-        r.label.Font = isSel and ThemeFontBold or ThemeFont
-        r.badge.Visible = (r.name == activeConfigName)
+local function buildDropList(names)
+    for _, r in ipairs(dropRows) do pcall(function() r:Destroy() end) end
+    dropRows = {}
+    for _, name in ipairs(names) do
+        local row = Instance.new("Frame")
+        row.Name = "DR_" .. name
+        row.Active = false
+        row.Size = UDim2.new(1, 0, 0, 24)
+        row.BackgroundColor3 = (name == selectedConfig) and Color3.fromRGB(30, 16, 20) or Color3.fromRGB(20, 20, 26)
+        row.BorderSizePixel = 0
+        row.ZIndex = 621
+        row.Parent = DropList
+        local rc = Instance.new("UICorner") rc.CornerRadius = UDim.new(0, 3) rc.Parent = row
+        local rs = Instance.new("UIStroke") rs.Thickness = 1
+        rs.Color = (name == selectedConfig) and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(36, 38, 48)
+        rs.ApplyStrokeMode = Enum.ApplyStrokeMode.Border rs.Parent = row
+        local rdot = Instance.new("Frame") rdot.Active = false rdot.Size = UDim2.new(0, 5, 0, 5)
+        rdot.Position = UDim2.new(0, 7, 0.5, -2.5)
+        rdot.BackgroundColor3 = (name == selectedConfig) and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(48, 52, 64)
+        rdot.BorderSizePixel = 0 rdot.ZIndex = 622 rdot.Parent = row
+        local rdc = Instance.new("UICorner") rdc.CornerRadius = UDim.new(0, 3) rdc.Parent = rdot
+        local rl = Instance.new("TextLabel") rl.Active = false rl.Size = UDim2.new(1, -22, 1, 0)
+        rl.Position = UDim2.new(0, 18, 0, 0) rl.BackgroundTransparency = 1
+        rl.Font = (name == selectedConfig) and ThemeFontBold or ThemeFont
+        rl.Text = name rl.TextSize = 11
+        rl.TextColor3 = (name == selectedConfig) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(170, 175, 190)
+        rl.TextXAlignment = Enum.TextXAlignment.Left rl.TextYAlignment = Enum.TextYAlignment.Center
+        rl.TextTruncate = Enum.TextTruncate.AtEnd rl.ZIndex = 622 rl.Parent = row
+        if name == activeConfigName then
+            local badge = Instance.new("TextLabel") badge.Active = false badge.Size = UDim2.new(0, 40, 0, 14)
+            badge.Position = UDim2.new(1, -44, 0.5, -7)
+            badge.BackgroundColor3 = Color3.fromRGB(34, 16, 20) badge.Font = ThemeFontBold
+            badge.Text = "active" badge.TextSize = 8 badge.TextColor3 = Color3.fromRGB(230, 57, 70)
+            badge.TextXAlignment = Enum.TextXAlignment.Center badge.TextYAlignment = Enum.TextYAlignment.Center
+            badge.ZIndex = 623 badge.Parent = row
+            local bco = Instance.new("UICorner") bco.CornerRadius = UDim.new(0, 3) bco.Parent = badge
+            local bst = Instance.new("UIStroke") bst.Thickness = 1 bst.Color = Color3.fromRGB(230, 57, 70)
+            bst.ApplyStrokeMode = Enum.ApplyStrokeMode.Border bst.Parent = badge
+        end
+        table.insert(dropRows, { frame = row, name = name, stroke = rs, dot = rdot, lbl = rl })
     end
+    DropList.CanvasSize = UDim2.new(0, 0, 0, #names * 26 + 6)
 end
 
-local function refreshListUI()
-    for _, r in ipairs(configRows) do
-        if r.frame then pcall(function() r.frame:Destroy() end) end
-    end
-    configRows = {}
+local function openDrop()
+    isDropdownOpen = true
+    comboArrow.Text = "^"
+    comboStroke.Color = Color3.fromRGB(230, 57, 70)
+    buildDropList(getSavedConfigNames())
+    DropList.Visible = true
+end
 
-    local names = getSavedConfigNames()
-    local rowH = 26
-    ConfigScroll.CanvasSize = UDim2.new(0, 0, 0, #names * (rowH + 3) + 8)
-
-    for _, name in ipairs(names) do
-        local isSel = (name == selectedConfig)
-        local isActive = (name == activeConfigName)
-
-        local row = Instance.new("Frame")
-        row.Name = "Row_" .. name
-        row.Active = false
-        row.Size = UDim2.new(1, 0, 0, rowH)
-        row.BackgroundColor3 = isSel and Color3.fromRGB(34, 18, 22) or Color3.fromRGB(20, 20, 26)
-        row.BorderSizePixel = 0
-        row.ZIndex = 602
-        row.Parent = ConfigScroll
-
-        local rCorner = Instance.new("UICorner")
-        rCorner.CornerRadius = UDim.new(0, 3)
-        rCorner.Parent = row
-
-        local rStroke = Instance.new("UIStroke")
-        rStroke.Thickness = 1
-        rStroke.Color = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(36, 38, 48)
-        rStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-        rStroke.Parent = row
-
-        local rDot = Instance.new("Frame")
-        rDot.Name = "Dot"
-        rDot.Active = false
-        rDot.Size = UDim2.new(0, 6, 0, 6)
-        rDot.Position = UDim2.new(0, 8, 0.5, -3)
-        rDot.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(60, 64, 76)
-        rDot.BorderSizePixel = 0
-        rDot.ZIndex = 603
-        rDot.Parent = row
-
-        local dCorner = Instance.new("UICorner")
-        dCorner.CornerRadius = UDim.new(0, 3)
-        dCorner.Parent = rDot
-
-        local rLbl = Instance.new("TextLabel")
-        rLbl.Name = "Label"
-        rLbl.Active = false
-        rLbl.Size = UDim2.new(1, -110, 1, 0)
-        rLbl.Position = UDim2.new(0, 20, 0, 0)
-        rLbl.BackgroundTransparency = 1
-        rLbl.Font = isSel and ThemeFontBold or ThemeFont
-        rLbl.Text = name
-        rLbl.TextSize = 11
-        rLbl.TextColor3 = isSel and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(170, 175, 190)
-        rLbl.TextXAlignment = Enum.TextXAlignment.Left
-        rLbl.TextYAlignment = Enum.TextYAlignment.Center
-        rLbl.TextTruncate = Enum.TextTruncate.AtEnd
-        rLbl.ZIndex = 603
-        rLbl.Parent = row
-
-        -- Active badge
-        local rBadge = Instance.new("TextLabel")
-        rBadge.Name = "Badge"
-        rBadge.Active = false
-        rBadge.Size = UDim2.new(0, 46, 0, 16)
-        rBadge.Position = UDim2.new(1, -95, 0.5, -8)
-        rBadge.BackgroundColor3 = Color3.fromRGB(36, 18, 22)
-        rBadge.Font = ThemeFontBold
-        rBadge.Text = "ACTIVE"
-        rBadge.TextSize = 9
-        rBadge.TextColor3 = Color3.fromRGB(230, 57, 70)
-        rBadge.Visible = isActive
-        rBadge.ZIndex = 603
-        rBadge.Parent = row
-
-        local rbCorner = Instance.new("UICorner")
-        rbCorner.CornerRadius = UDim.new(0, 3)
-        rbCorner.Parent = rBadge
-
-        local rbStroke = Instance.new("UIStroke")
-        rbStroke.Thickness = 1
-        rbStroke.Color = Color3.fromRGB(230, 57, 70)
-        rbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-        rbStroke.Parent = rBadge
-
-        -- Quick Load Button
-        local qLoad = Instance.new("ImageLabel")
-        qLoad.Name = "QLoad"
-        qLoad.Active = false
-        qLoad.Size = UDim2.new(0, 14, 0, 14)
-        qLoad.Position = UDim2.new(1, -44, 0.5, -7)
-        qLoad.BackgroundTransparency = 1
-        qLoad.Image = "rbxassetid://77232797873154"
-        qLoad.ImageColor3 = Color3.fromRGB(230, 57, 70)
-        qLoad.ZIndex = 604
-        qLoad.Parent = row
-
-        -- Quick Delete Button
-        local qDel = Instance.new("ImageLabel")
-        qDel.Name = "QDel"
-        qDel.Active = false
-        qDel.Size = UDim2.new(0, 14, 0, 14)
-        qDel.Position = UDim2.new(1, -22, 0.5, -7)
-        qDel.BackgroundTransparency = 1
-        qDel.Image = "rbxassetid://119832272702307"
-        qDel.ImageColor3 = Color3.fromRGB(150, 80, 80)
-        qDel.ZIndex = 604
-        qDel.Parent = row
-
-        table.insert(configRows, {
-            name = name,
-            frame = row,
-            stroke = rStroke,
-            dot = rDot,
-            label = rLbl,
-            badge = rBadge,
-            qLoad = qLoad,
-            qDel = qDel
-        })
-    end
+local function closeDrop()
+    isDropdownOpen = false
+    comboArrow.Text = "v"
+    comboStroke.Color = Color3.fromRGB(44, 46, 58)
+    DropList.Visible = false
 end
 
 local function serializeCurrentConfig()
@@ -1445,271 +1195,172 @@ local function applyLoadedConfig(data)
     return true
 end
 
-local function saveConfig(name)
-    name = name or ConfigInput.Text
-    if not name or #name == 0 then
-        setStatus("Please enter a config name", false)
-        return
-    end
-    name = name:gsub("[^%w_%-]", "")
-    if #name == 0 then
-        setStatus("Invalid config name", false)
-        return
-    end
-
-    local data = serializeCurrentConfig()
-    local jsonStr = HttpService:JSONEncode(data)
-    local ok = writeConfigFile(name, jsonStr)
-
+local function doSave(name)
+    name = ((name and #name > 0) and name or ConfigInput.Text):gsub("[^%w_%-]", "")
+    if #name == 0 then setStatus("Enter a config name", false) return end
+    local ok = writeConfigFile(name, HttpService:JSONEncode(serializeCurrentConfig()))
     if ok then
-        activeConfigName = name
-        selectedConfig = name
+        activeConfigName = name selectedConfig = name
         HeaderCfgLabel.Text = "Config: " .. name
-        refreshListUI()
-        selectConfigRow(name)
-        setStatus("✓ Saved to workspace/DeadHub/Configs/" .. name .. ".json", true)
+        ConfigInput.Text = name
+        setStatus("Saved: " .. name .. ".json", true)
     else
-        setStatus("Failed to write config file to workspace", false)
+        setStatus("Write failed. Check workspace access", false)
     end
 end
 
-local function loadConfig(name)
-    name = name or selectedConfig
-    if not name or #name == 0 then
-        setStatus("Please select a config to load", false)
-        return
-    end
-    name = name:gsub("[^%w_%-]", "")
-
+local function doLoad(name)
+    name = ((name and #name > 0) and name or ConfigInput.Text):gsub("[^%w_%-]", "")
+    if #name == 0 then setStatus("Enter or select a config", false) return end
     local content = readConfigFile(name)
-    if not content or #content == 0 then
-        setStatus("Config file \"" .. name .. ".json\" not found on PC disk", false)
-        return
-    end
-
+    if not content or #content == 0 then setStatus("Not found: " .. name .. ".json", false) return end
     local data = nil
-    pcall(function()
-        data = HttpService:JSONDecode(content)
-    end)
-
+    pcall(function() data = HttpService:JSONDecode(content) end)
     if data and applyLoadedConfig(data) then
-        activeConfigName = name
-        selectedConfig = name
+        activeConfigName = name selectedConfig = name
         HeaderCfgLabel.Text = "Config: " .. name
-        refreshListUI()
-        selectConfigRow(name)
-        setStatus("✓ Loaded \"" .. name .. ".json\" from PC disk", true)
+        ConfigInput.Text = name
+        setStatus("Loaded: " .. name .. ".json", true)
     else
-        setStatus("Failed to parse config file: " .. name .. ".json", false)
+        setStatus("Parse error: " .. name .. ".json", false)
     end
 end
 
-local function deleteConfig(name)
-    name = name or selectedConfig
-    if not name or #name == 0 then
-        setStatus("Please select a config to delete", false)
-        return
-    end
-    name = name:gsub("[^%w_%-]", "")
-
-    local deleted = deleteConfigFile(name)
-    if deleted then
-        local names = getSavedConfigNames()
-        selectedConfig = names[1] or "default"
-        if activeConfigName == name then
-            activeConfigName = selectedConfig
-            HeaderCfgLabel.Text = "Config: " .. activeConfigName
-        end
-        refreshListUI()
-        selectConfigRow(selectedConfig)
-        setStatus("✓ Deleted \"" .. name .. ".json\" from PC disk", true)
+local function doDelete(name)
+    name = ((name and #name > 0) and name or ConfigInput.Text):gsub("[^%w_%-]", "")
+    if #name == 0 then setStatus("Enter or select a config", false) return end
+    if deleteConfigFile(name) then
+        if activeConfigName == name then activeConfigName = "default" HeaderCfgLabel.Text = "Config: default" end
+        if autoLoadName == name then autoLoadName = nil writeAutoLoad("") autoDot.BackgroundColor3 = Color3.fromRGB(55, 58, 72) end
+        selectedConfig = "default" ConfigInput.Text = "default"
+        setStatus("Deleted: " .. name .. ".json", true)
     else
-        setStatus("Could not delete \"" .. name .. ".json\"", false)
+        setStatus("Delete failed: " .. name, false)
+    end
+end
+
+local function doToggleAutoLoad()
+    local name = (ConfigInput.Text ~= "" and ConfigInput.Text or selectedConfig):gsub("[^%w_%-]", "")
+    if #name == 0 then setStatus("Select a config first", false) return end
+    if autoLoadName == name then
+        autoLoadName = nil writeAutoLoad("")
+        autoDot.BackgroundColor3 = Color3.fromRGB(55, 58, 72)
+        AutoStroke.Color = Color3.fromRGB(42, 44, 58)
+        setStatus("Auto-load OFF", false)
+    else
+        autoLoadName = name writeAutoLoad(name)
+        autoDot.BackgroundColor3 = Color3.fromRGB(80, 210, 120)
+        AutoStroke.Color = Color3.fromRGB(56, 164, 84)
+        setStatus("Auto-load ON: " .. name, true)
     end
 end
 
 local function openConfigWindow()
     if isConfigWindowOpen then
-        isConfigWindowOpen = false
-        ConfigWindow.Visible = false
-        hcbArrow.Text = "v"
-        return
+        isConfigWindowOpen = false ConfigWindow.Visible = false hcbArrow.Text = "v" closeDrop() return
     end
-
     local ap = HeaderCfgBtn.AbsolutePosition
     local as = HeaderCfgBtn.AbsoluteSize
-    local cam = workspace.CurrentCamera
-    local vp = cam and cam.ViewportSize or Vector2.new(1920, 1080)
-
-    local posX = math.clamp(ap.X, 10, math.max(10, vp.X - ConfigWindow.Size.X.Offset - 10))
+    local vp2 = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)
+    local posX = math.clamp(ap.X, 10, vp2.X - 310)
     local posY = ap.Y + as.Y + 4
-    if posY + ConfigWindow.Size.Y.Offset > vp.Y - 10 then
-        posY = math.clamp(ap.Y - ConfigWindow.Size.Y.Offset - 4, 10, vp.Y - 380)
-    end
-
+    if posY + 285 > vp2.Y then posY = ap.Y - 285 end
     ConfigWindow.Position = UDim2.fromOffset(posX, posY)
-    refreshListUI()
-    selectConfigRow(selectedConfig)
-    ConfigWindow.Visible = true
-    isConfigWindowOpen = true
-    hcbArrow.Text = "^"
+    ConfigWindow.Visible = true isConfigWindowOpen = true hcbArrow.Text = "^"
+    if autoLoadName then AutoStroke.Color = Color3.fromRGB(56, 164, 84) autoDot.BackgroundColor3 = Color3.fromRGB(80, 210, 120) end
 end
 
 local function closeConfigWindow()
-    isConfigWindowOpen = false
-    ConfigWindow.Visible = false
-    hcbArrow.Text = "v"
+    isConfigWindowOpen = false ConfigWindow.Visible = false hcbArrow.Text = "v" closeDrop()
 end
 
--- Wire up Header Trigger Button
 table.insert(clickableRegistry, {
     object = HeaderCfgBtn,
     onClick = openConfigWindow,
     onHover = function(isHov)
-        TweenService:Create(hcbStroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
-            Color = isHov and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(44, 46, 58)
-        }):Play()
-        TweenService:Create(HeaderCfgBtn, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+        TweenService:Create(HeaderCfgBtn, TweenInfo.new(0.13, Enum.EasingStyle.Quad), {
             BackgroundColor3 = isHov and Color3.fromRGB(28, 28, 36) or Color3.fromRGB(22, 22, 28)
         }):Play()
-        TweenService:Create(hcbArrow, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
-            TextColor3 = isHov and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(140, 145, 160)
+        TweenService:Create(hcbStroke, TweenInfo.new(0.13, Enum.EasingStyle.Quad), {
+            Color = isHov and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(44, 46, 58)
         }):Play()
     end
 })
 
--- Wire up Modal Elements & Interactive Hit Testing
 ConfigManager = {
-    Save = saveConfig,
-    Load = loadConfig,
-    Delete = deleteConfig,
-    Open = openConfigWindow,
-    Close = closeConfigWindow,
-    Refresh = refreshListUI,
+    Save = doSave, Load = doLoad, Delete = doDelete,
+    Open = openConfigWindow, Close = closeConfigWindow,
     IsVisible = function() return isConfigWindowOpen end,
     Window = ConfigWindow,
     HandleClick = function(clickX, clickY)
         if not isConfigWindowOpen then return false end
-
-        -- Close Button
-        if isInside(clickX, clickY, CwCloseBtn) then
-            closeConfigWindow()
-            return true
-        end
-
-        -- Header Trigger Button clicked again
-        if isInside(clickX, clickY, HeaderCfgBtn) then
-            closeConfigWindow()
-            return true
-        end
-
+        if isInside(clickX, clickY, CwCloseBtn) then closeConfigWindow() return true end
         if isInside(clickX, clickY, ConfigWindow) then
-            -- Save Button
-            if isInside(clickX, clickY, SaveBtn) then
-                saveConfig(ConfigInput.Text)
+            if isInside(clickX, clickY, DropArrowBtn) then
+                if isDropdownOpen then closeDrop() else openDrop() end
                 return true
             end
-
-            -- Load Selected Button
-            if isInside(clickX, clickY, LoadBtn) then
-                loadConfig(selectedConfig)
-                return true
-            end
-
-            -- Delete Selected Button
-            if isInside(clickX, clickY, DelBtn) then
-                deleteConfig(selectedConfig)
-                return true
-            end
-
-            -- Refresh Button
-            if isInside(clickX, clickY, RefreshBtn) then
-                refreshListUI()
-                selectConfigRow(selectedConfig)
-                setStatus("✓ Refreshed list from PC workspace", true)
-                return true
-            end
-
-            -- Click on row or quick actions
-            for _, r in ipairs(configRows) do
-                if isInside(clickX, clickY, r.frame) then
-                    if isInside(clickX, clickY, r.qDel) then
-                        deleteConfig(r.name)
-                        return true
-                    elseif isInside(clickX, clickY, r.qLoad) then
-                        loadConfig(r.name)
-                        return true
-                    else
-                        selectConfigRow(r.name)
-                        return true
+            if isDropdownOpen then
+                if isInside(clickX, clickY, DropList) then
+                    for _, r in ipairs(dropRows) do
+                        if isInside(clickX, clickY, r.frame) then
+                            selectedConfig = r.name ConfigInput.Text = r.name closeDrop() return true
+                        end
                     end
                 end
+                closeDrop() return true
             end
-
+            if isInside(clickX, clickY, SaveBtn)  then doSave(ConfigInput.Text)  return true end
+            if isInside(clickX, clickY, LoadBtn)  then doLoad(ConfigInput.Text)  return true end
+            if isInside(clickX, clickY, DelBtn)   then doDelete(ConfigInput.Text)  return true end
+            if isInside(clickX, clickY, AutoBtn)  then doToggleAutoLoad()   return true end
             return true
         else
-            closeConfigWindow()
-            return true
+            if isDropdownOpen then closeDrop() return true end
+            closeConfigWindow() return true
         end
     end,
     HandleHover = function(mx, my)
         if not isConfigWindowOpen then return false end
         if not isInside(mx, my, ConfigWindow) then return false end
-
-        -- Close button hover
-        local isCloseHov = isInside(mx, my, CwCloseBtn)
-        CwCloseBtn.TextColor3 = isCloseHov and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(150, 155, 170)
-
-        -- Save button hover
-        local isSaveHov = isInside(mx, my, SaveBtn)
-        sbStroke.Color = isSaveHov and Color3.fromRGB(80, 210, 120) or Color3.fromRGB(46, 76, 52)
-        SaveBtn.BackgroundColor3 = isSaveHov and Color3.fromRGB(28, 42, 32) or Color3.fromRGB(22, 32, 24)
-
-        -- Load button hover
-        local isLoadHov = isInside(mx, my, LoadBtn)
-        lbStroke.Color = isLoadHov and Color3.fromRGB(255, 80, 95) or Color3.fromRGB(230, 57, 70)
-        LoadBtn.BackgroundColor3 = isLoadHov and Color3.fromRGB(44, 22, 28) or Color3.fromRGB(34, 18, 22)
-
-        -- Delete button hover
-        local isDelHov = isInside(mx, my, DelBtn)
-        dbStroke.Color = isDelHov and Color3.fromRGB(240, 80, 80) or Color3.fromRGB(60, 36, 40)
-        DelBtn.BackgroundColor3 = isDelHov and Color3.fromRGB(36, 22, 24) or Color3.fromRGB(28, 18, 20)
-
-        -- Refresh button hover
-        local isRfHov = isInside(mx, my, RefreshBtn)
-        rfStroke.Color = isRfHov and Color3.fromRGB(70, 75, 95) or Color3.fromRGB(44, 46, 58)
-        RefreshBtn.BackgroundColor3 = isRfHov and Color3.fromRGB(28, 28, 36) or Color3.fromRGB(22, 22, 28)
-
-        -- Rows hover
-        for _, r in ipairs(configRows) do
-            local isHov = isInside(mx, my, r.frame)
-            local isSel = (r.name == selectedConfig)
-            if not isSel then
-                r.stroke.Color = isHov and Color3.fromRGB(65, 70, 85) or Color3.fromRGB(36, 38, 48)
-                r.frame.BackgroundColor3 = isHov and Color3.fromRGB(26, 26, 34) or Color3.fromRGB(20, 20, 26)
-            end
-            if isInside(mx, my, r.qDel) then
-                r.qDel.ImageColor3 = Color3.fromRGB(240, 80, 80)
-            else
-                r.qDel.ImageColor3 = Color3.fromRGB(150, 80, 80)
-            end
-            if isInside(mx, my, r.qLoad) then
-                r.qLoad.ImageColor3 = Color3.fromRGB(255, 80, 95)
-            else
-                r.qLoad.ImageColor3 = Color3.fromRGB(230, 57, 70)
+        CwCloseBtn.TextColor3 = isInside(mx, my, CwCloseBtn) and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(130, 135, 155)
+        local function hBtn(btn, stroke2, hBg, dBg, hStr, dStr)
+            local h = isInside(mx, my, btn)
+            btn.BackgroundColor3 = h and hBg or dBg
+            stroke2.Color = h and hStr or dStr
+        end
+        hBtn(SaveBtn, SaveStroke, Color3.fromRGB(22, 36, 24), Color3.fromRGB(18, 28, 20), Color3.fromRGB(80, 210, 120), Color3.fromRGB(44, 72, 50))
+        hBtn(LoadBtn, LoadStroke, Color3.fromRGB(38, 20, 26), Color3.fromRGB(28, 16, 20), Color3.fromRGB(255, 75, 90), Color3.fromRGB(220, 55, 68))
+        hBtn(DelBtn,  DelStroke,  Color3.fromRGB(32, 18, 20), Color3.fromRGB(24, 15, 17), Color3.fromRGB(235, 80, 80), Color3.fromRGB(76, 38, 42))
+        hBtn(AutoBtn, AutoStroke, Color3.fromRGB(20, 20, 30), Color3.fromRGB(16, 16, 24),
+            autoLoadName and Color3.fromRGB(56, 164, 84) or Color3.fromRGB(55, 58, 78),
+            autoLoadName and Color3.fromRGB(44, 130, 66) or Color3.fromRGB(42, 44, 58))
+        if isInside(mx, my, DropArrowBtn) then
+            comboStroke.Color = Color3.fromRGB(90, 94, 120)
+        elseif not isDropdownOpen then
+            comboStroke.Color = Color3.fromRGB(44, 46, 58)
+        end
+        if isDropdownOpen then
+            for _, r in ipairs(dropRows) do
+                local h = isInside(mx, my, r.frame)
+                local isSel = (r.name == selectedConfig)
+                r.frame.BackgroundColor3 = isSel and Color3.fromRGB(30, 16, 20) or (h and Color3.fromRGB(26, 26, 34) or Color3.fromRGB(20, 20, 26))
+                if not isSel then r.stroke.Color = h and Color3.fromRGB(60, 64, 80) or Color3.fromRGB(36, 38, 48) end
             end
         end
-
         return true
     end,
     HandleWheel = function(deltaZ)
         if not isConfigWindowOpen then return false end
-        local maxScroll = math.max(0, ConfigScroll.CanvasSize.Y.Offset - ConfigScroll.AbsoluteWindowSize.Y)
-        local newY = math.clamp(ConfigScroll.CanvasPosition.Y - deltaZ * 26, 0, maxScroll)
-        ConfigScroll.CanvasPosition = Vector2.new(0, newY)
-        return true
+        if isDropdownOpen then
+            local mx_ = math.max(0, DropList.CanvasSize.Y.Offset - DropList.AbsoluteWindowSize.Y)
+            DropList.CanvasPosition = Vector2.new(0, math.clamp(DropList.CanvasPosition.Y - deltaZ * 22, 0, mx_))
+            return true
+        end
+        return false
     end
 }
+end -- close Config Manager do..end scope
 end -- close Config Manager do..end scope
 
 -- Right Header Section: System & Session Metadata Badges (Time & Memory Usage)
