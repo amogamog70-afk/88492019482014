@@ -664,10 +664,13 @@ Subtitle.TextYAlignment = Enum.TextYAlignment.Center
 Subtitle.TextTruncate = Enum.TextTruncate.AtEnd
 Subtitle.Parent = Header
 
--- ====================================================================
+-- Forward declarations for use outside the do..end scope
+local HeaderCfgBtn, HeaderCfgLabel, hcbArrow
+local activeConfigName = "default"
+
+do -- ====================================================================
 -- Neverlose-Style Config Manager (Header Button & Full Floating Manager Window)
 -- ====================================================================
-local activeConfigName = "default"
 local isConfigWindowOpen = false
 local localSessionConfigs = { ["default"] = true }
 local configRows = {}
@@ -815,7 +818,7 @@ local function getSavedConfigNames()
 end
 
 -- 1. Header Trigger Button (Neverlose Style Glass Button)
-local HeaderCfgBtn = Instance.new("Frame")
+HeaderCfgBtn = Instance.new("Frame")
 HeaderCfgBtn.Name = "HeaderCfgBtn"
 HeaderCfgBtn.Active = false
 HeaderCfgBtn.Size = UDim2.new(0, 180, 0, 26)
@@ -846,7 +849,7 @@ hcbIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
 hcbIcon.ZIndex = 51
 hcbIcon.Parent = HeaderCfgBtn
 
-local HeaderCfgLabel = Instance.new("TextLabel")
+HeaderCfgLabel = Instance.new("TextLabel")
 HeaderCfgLabel.Name = "Label"
 HeaderCfgLabel.Active = false
 HeaderCfgLabel.Size = UDim2.new(1, -48, 1, 0)
@@ -862,7 +865,7 @@ HeaderCfgLabel.TextTruncate = Enum.TextTruncate.AtEnd
 HeaderCfgLabel.ZIndex = 51
 HeaderCfgLabel.Parent = HeaderCfgBtn
 
-local hcbArrow = Instance.new("TextLabel")
+hcbArrow = Instance.new("TextLabel")
 hcbArrow.Name = "Arrow"
 hcbArrow.Active = false
 hcbArrow.Size = UDim2.new(0, 16, 1, 0)
@@ -1712,6 +1715,7 @@ ConfigManager = {
         return true
     end
 }
+end -- close Config Manager do..end scope
 
 -- Right Header Section: System & Session Metadata Badges (Time & Memory Usage)
 local HeaderStats = Instance.new("Frame")
