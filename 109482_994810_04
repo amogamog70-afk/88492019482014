@@ -1993,9 +1993,8 @@ local ColorPicker = (function()
             end
             return true -- Absorbed
         else
-            local isSwatch = activeColorPicker and activeColorPicker.swatch and isInside(clickX, clickY, activeColorPicker.swatch)
             close()
-            return isSwatch
+            return true -- Dismisses color picker and completely absorbs the click
         end
     end
 
@@ -2315,6 +2314,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         local clickX = input.Position.X
         local clickY = input.Position.Y
 
+        if ColorPicker.Window.Visible then
+            ColorPicker.Close()
+            return
+        end
+
         if ContextMenu.Visible then
             ContextMenu.Visible = false
             isListeningKeybind = false
@@ -2416,7 +2420,18 @@ UserInputService.InputChanged:Connect(function(input)
 
         -- Neverlose-style dynamic smooth hover reactions (Zero-GPE)
         if MainFrame.Visible and menuOpen then
-            if ContextMenu.Visible then
+            if ColorPicker.Window.Visible then
+                -- Modal isolation: reset any existing hover states outside color picker
+                for _, item in ipairs(clickableRegistry) do
+                    if item._isHovered then
+                        item._isHovered = false
+                        if item.onHover then pcall(item.onHover, false) end
+                    end
+                end
+                if isInside(mx, my, ColorPicker.Window) then
+                    anyInteractiveHovered = true
+                end
+            elseif ContextMenu.Visible then
                 -- Modal isolation: reset any existing hover states outside context menu
                 for _, item in ipairs(clickableRegistry) do
                     if item._isHovered then
@@ -2493,10 +2508,10 @@ UserInputService.InputChanged:Connect(function(input)
             end)
         end
 
-        if ContextMenu.Visible then
-            -- Dragging disabled while ContextMenu is open
-        elseif ColorPicker.HandleDrag(mx, my) then
-            -- Drag updated
+        if ColorPicker.HandleDrag(mx, my) then
+            -- Drag updated inside color picker
+        elseif ColorPicker.Window.Visible or ContextMenu.Visible then
+            -- Dragging of other elements (sliders, window, etc.) strictly blocked while modal is open
         elseif activeSlider then
             activeSlider.update(input.Position.X)
         elseif isDraggingWM then
@@ -3304,6 +3319,7 @@ end
                         getKey = function() return boundKey end,
                         setKey = function(newKey)
                             boundKey = newKey
+                            hasKeybind = (boundKey ~= nil or mode == "always")
                             updateKeybindDisplay()
                         end,
                         toggle = function()
@@ -3319,8 +3335,8 @@ end
                     })
                 end
 
+                registerRightClick()
                 if hasKeybind then
-                    registerRightClick()
                     updateKeybindDisplay()
                 end
 
@@ -3328,30 +3344,20 @@ end
                     Set = function(self, val) setToggle(val) end,
                     Get = function(self) return state end,
                     AddKeybind = function(self, k, m)
-                        if not hasKeybind then
-                            hasKeybind = true
-                            if k then boundKey = k end
-                            if m then mode = m end
-                            registerRightClick()
-                            updateKeybindDisplay()
-                        end
+                        hasKeybind = true
+                        if k ~= nil then boundKey = k end
+                        if m ~= nil then mode = m end
+                        updateKeybindDisplay()
                         return self
                     end,
                     SetKey = function(self, k)
-                        if not hasKeybind then
-                            self:AddKeybind(k)
-                        else
-                            boundKey = k
-                            updateKeybindDisplay()
-                        end
+                        boundKey = k
+                        hasKeybind = (boundKey ~= nil or mode == "always")
+                        updateKeybindDisplay()
                     end,
                     SetMode = function(self, m)
-                        if not hasKeybind then
-                            self:AddKeybind(nil, m)
-                        else
-                            mode = m
-                            if m == "always" then setToggle(true) else updateKeybindDisplay() end
-                        end
+                        mode = m
+                        if m == "always" then setToggle(true) else updateKeybindDisplay() end
                     end,
                     AddColorpicker = function(self, defaultColor, defaultAlpha, cb)
                         defaultColor = defaultColor or Color3.fromRGB(230, 57, 70)
