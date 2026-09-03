@@ -1,9 +1,4 @@
---[[
-    DeadHub UI Library - Trident Survival Safe Edition
-    Architecture: Zero-GPE (Zero GameProcessedEvent)
-    Security: Completely passive elements, no TextButton/ImageButton, Active = false
-    Style: Classic Sharp Square / Clean Minimal 1px Outline
-]]
+
 
 local cloneref = cloneref or function(o) return o end
 local CoreGui = cloneref(game:GetService("CoreGui"))
