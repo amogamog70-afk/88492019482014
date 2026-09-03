@@ -1663,8 +1663,9 @@ local ColorPicker = (function()
     PreviewBox.Active = false
     PreviewBox.Size = UDim2.new(0, 28, 0, 28)
     PreviewBox.Position = UDim2.new(0, 8, 0, 118)
-    PreviewBox.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+    PreviewBox.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
     PreviewBox.BorderSizePixel = 0
+    PreviewBox.ClipsDescendants = true
     PreviewBox.ZIndex = 251
     PreviewBox.Parent = Window
 
@@ -1677,8 +1678,6 @@ local ColorPicker = (function()
     prevStroke.Color = Color3.fromRGB(44, 46, 56)
     prevStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     prevStroke.Parent = PreviewBox
-
-    createCheckerboard(PreviewBox, 28, 28, 7, 251)
 
     local PreviewColor = Instance.new("Frame")
     PreviewColor.Name = "PreviewColor"
@@ -2215,6 +2214,11 @@ local function updateContextMenuUI()
 
     local curMode = activeContextItem.getMode()
     for mName, mObj in pairs(modeButtons) do
+        if mObj.activeStrokeTween then
+            mObj.activeStrokeTween:Cancel()
+            mObj.activeStrokeTween = nil
+        end
+        mObj._isHov = false
         local isSelected = (mName == curMode)
         mObj.dot.Visible = isSelected
         mObj.lbl.TextColor3 = isSelected and Color3.fromRGB(245, 245, 250) or Color3.fromRGB(150, 155, 170)
@@ -2501,20 +2505,36 @@ UserInputService.InputChanged:Connect(function(input)
                     local isHov = isInside(mx, my, mObj.row)
                     if isHov then anyInteractiveHovered = true end
                     local isSelected = (mName == curMode)
-                    if not isSelected then
-                        TweenService:Create(mObj.stroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
-                            Color = isHov and Color3.fromRGB(70, 76, 96) or Color3.fromRGB(36, 38, 46)
-                        }):Play()
-                        TweenService:Create(mObj.row, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
-                            BackgroundColor3 = isHov and Color3.fromRGB(28, 28, 34) or Color3.fromRGB(24, 24, 28)
-                        }):Play()
-                        TweenService:Create(mObj.lbl, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
-                            TextColor3 = isHov and Color3.fromRGB(230, 235, 245) or Color3.fromRGB(150, 155, 170)
-                        }):Play()
+                    if isSelected then
+                        if mObj.activeStrokeTween then
+                            mObj.activeStrokeTween:Cancel()
+                            mObj.activeStrokeTween = nil
+                        end
+                        mObj.stroke.Color = Color3.fromRGB(230, 57, 70)
+                        mObj.dot.Visible = true
+                        if mObj._isHov ~= isHov then
+                            mObj._isHov = isHov
+                            TweenService:Create(mObj.row, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                                BackgroundColor3 = isHov and Color3.fromRGB(32, 32, 40) or Color3.fromRGB(28, 28, 34)
+                            }):Play()
+                        end
                     else
-                        TweenService:Create(mObj.row, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
-                            BackgroundColor3 = isHov and Color3.fromRGB(32, 32, 40) or Color3.fromRGB(28, 28, 34)
-                        }):Play()
+                        mObj.dot.Visible = false
+                        if mObj._isHov ~= isHov then
+                            mObj._isHov = isHov
+                            if mObj.activeStrokeTween then mObj.activeStrokeTween:Cancel() end
+                            mObj.activeStrokeTween = TweenService:Create(mObj.stroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                                Color = isHov and Color3.fromRGB(70, 76, 96) or Color3.fromRGB(36, 38, 46)
+                            })
+                            mObj.activeStrokeTween:Play()
+
+                            TweenService:Create(mObj.row, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                                BackgroundColor3 = isHov and Color3.fromRGB(28, 28, 34) or Color3.fromRGB(24, 24, 28)
+                            }):Play()
+                            TweenService:Create(mObj.lbl, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                                TextColor3 = isHov and Color3.fromRGB(230, 235, 245) or Color3.fromRGB(150, 155, 170)
+                            }):Play()
+                        end
                     end
                 end
             else
