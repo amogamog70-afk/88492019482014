@@ -1361,7 +1361,6 @@ ConfigManager = {
     end
 }
 end -- close Config Manager do..end scope
-end -- close Config Manager do..end scope
 
 -- Right Header Section: System & Session Metadata Badges (Time & Memory Usage)
 local HeaderStats = Instance.new("Frame")
