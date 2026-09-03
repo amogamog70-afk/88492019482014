@@ -2476,18 +2476,36 @@ end
                 Label.ZIndex = 25
                 Label.Parent = Row
 
-                -- Value Box Frame (Holds the editable number + permanent un-editable unit suffix)
+                -- Value Container (Wrapper on the right for standalone TextBox + outside UnitLabel)
+                local ValContainer = Instance.new("Frame")
+                ValContainer.Name = "ValContainer"
+                ValContainer.Active = false
+                ValContainer.AnchorPoint = Vector2.new(1, 0)
+                ValContainer.Position = UDim2.new(1, 0, 0, 0)
+                ValContainer.Size = UDim2.new(0, 0, 0, 20)
+                ValContainer.AutomaticSize = Enum.AutomaticSize.X
+                ValContainer.BackgroundTransparency = 1
+                ValContainer.ZIndex = 25
+                ValContainer.Parent = Row
+
+                local ValContainerLayout = Instance.new("UIListLayout")
+                ValContainerLayout.FillDirection = Enum.FillDirection.Horizontal
+                ValContainerLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+                ValContainerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                ValContainerLayout.Padding = UDim.new(0, 4)
+                ValContainerLayout.Parent = ValContainer
+
+                -- Standalone TextBox Frame (Contains ONLY the editable number)
                 local ValBoxFrame = Instance.new("Frame")
                 ValBoxFrame.Name = "ValBoxFrame"
                 ValBoxFrame.Active = false
-                ValBoxFrame.AnchorPoint = Vector2.new(1, 0)
-                ValBoxFrame.Position = UDim2.new(1, 0, 0, 0)
-                ValBoxFrame.Size = UDim2.new(0, 0, 0, 20)
+                ValBoxFrame.LayoutOrder = 1
+                ValBoxFrame.Size = UDim2.new(0, 36, 0, 20)
                 ValBoxFrame.AutomaticSize = Enum.AutomaticSize.X
                 ValBoxFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
                 ValBoxFrame.BorderSizePixel = 0
                 ValBoxFrame.ZIndex = 25
-                ValBoxFrame.Parent = Row
+                ValBoxFrame.Parent = ValContainer
 
                 local ValBoxCorner = Instance.new("UICorner")
                 ValBoxCorner.CornerRadius = UDim.new(0, 3)
@@ -2499,24 +2517,15 @@ end
                 ValBoxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 ValBoxStroke.Parent = ValBoxFrame
 
-                local ValBoxLayout = Instance.new("UIListLayout")
-                ValBoxLayout.FillDirection = Enum.FillDirection.Horizontal
-                ValBoxLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-                ValBoxLayout.SortOrder = Enum.SortOrder.LayoutOrder
-                ValBoxLayout.Padding = UDim.new(0, 2)
-                ValBoxLayout.Parent = ValBoxFrame
-
                 local ValBoxPadding = Instance.new("UIPadding")
                 ValBoxPadding.PaddingLeft = UDim.new(0, 6)
                 ValBoxPadding.PaddingRight = UDim.new(0, 6)
                 ValBoxPadding.Parent = ValBoxFrame
 
-                -- Editable Numeric TextBox (Only the number, e.g. 100)
                 local ValBox = Instance.new("TextBox")
                 ValBox.Name = "ValBox"
                 ValBox.Active = false
-                ValBox.LayoutOrder = 1
-                ValBox.Size = UDim2.new(0, 18, 1, 0)
+                ValBox.Size = UDim2.new(1, 0, 1, 0)
                 ValBox.AutomaticSize = Enum.AutomaticSize.X
                 ValBox.BackgroundTransparency = 1
                 ValBox.Font = ThemeFontBold
@@ -2529,7 +2538,7 @@ end
                 ValBox.ZIndex = 26
                 ValBox.Parent = ValBoxFrame
 
-                -- Permanent, Non-Editable Unit Label (e.g. %, studs, meters)
+                -- Permanent Unit Label (Strictly OUTSIDE of the TextBox)
                 local cleanSuffix = tostring(suffix or ""):gsub("^%s+", "")
                 local UnitLabel = nil
                 if cleanSuffix ~= "" then
@@ -2547,7 +2556,7 @@ end
                     UnitLabel.TextXAlignment = Enum.TextXAlignment.Left
                     UnitLabel.TextYAlignment = Enum.TextYAlignment.Center
                     UnitLabel.ZIndex = 26
-                    UnitLabel.Parent = ValBoxFrame
+                    UnitLabel.Parent = ValContainer
                 end
 
                 local Track = Instance.new("Frame")
