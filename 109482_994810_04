@@ -2440,11 +2440,11 @@ end
             ColStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
             ColStroke.Parent = ColCard
 
-            -- Column Header (28px)
+            -- Column Header (30px)
             local ColHeader = Instance.new("Frame")
             ColHeader.Name = "ColHeader"
             ColHeader.Active = false
-            ColHeader.Size = UDim2.new(1, 0, 0, 28)
+            ColHeader.Size = UDim2.new(1, 0, 0, 30)
             ColHeader.BackgroundTransparency = 1
             ColHeader.ZIndex = 23
             ColHeader.Parent = ColCard
@@ -2454,10 +2454,11 @@ end
                 local ColIcon = Instance.new("ImageLabel")
                 ColIcon.Name = "ColIcon"
                 ColIcon.Active = false
-                ColIcon.Size = UDim2.new(0, 14, 0, 14)
-                ColIcon.Position = UDim2.new(0, 10, 0.5, -7)
+                ColIcon.Size = UDim2.new(0, 20, 0, 20)
+                ColIcon.Position = UDim2.new(0, 10, 0.5, -10)
                 ColIcon.BackgroundTransparency = 1
                 ColIcon.Image = colIconAsset
+                ColIcon.ScaleType = Enum.ScaleType.Fit
                 ColIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
                 ColIcon.ZIndex = 24
                 ColIcon.Parent = ColHeader
@@ -2466,8 +2467,8 @@ end
             local ColHeaderText = Instance.new("TextLabel")
             ColHeaderText.Name = "ColHeaderText"
             ColHeaderText.Active = false
-            ColHeaderText.Size = colIconAsset and UDim2.new(1, -38, 1, 0) or UDim2.new(1, -24, 1, 0)
-            ColHeaderText.Position = colIconAsset and UDim2.new(0, 30, 0, 0) or UDim2.new(0, 12, 0, 0)
+            ColHeaderText.Size = colIconAsset and UDim2.new(1, -44, 1, 0) or UDim2.new(1, -24, 1, 0)
+            ColHeaderText.Position = colIconAsset and UDim2.new(0, 36, 0, 0) or UDim2.new(0, 12, 0, 0)
             ColHeaderText.BackgroundTransparency = 1
             ColHeaderText.Font = ThemeFontBold
             ColHeaderText.Text = colTitle
@@ -2482,7 +2483,7 @@ end
             ColDivider.Name = "ColDivider"
             ColDivider.Active = false
             ColDivider.Size = UDim2.new(1, 0, 0, 1)
-            ColDivider.Position = UDim2.new(0, 0, 0, 28)
+            ColDivider.Position = UDim2.new(0, 0, 0, 30)
             ColDivider.BackgroundColor3 = Color3.fromRGB(32, 34, 42)
             ColDivider.BorderSizePixel = 0
             ColDivider.ZIndex = 23
@@ -2493,7 +2494,7 @@ end
             ColContent.Name = "ColContent"
             ColContent.Active = false
             ColContent.Size = UDim2.new(1, 0, 0, 0)
-            ColContent.Position = UDim2.new(0, 0, 0, 29)
+            ColContent.Position = UDim2.new(0, 0, 0, 31)
             ColContent.AutomaticSize = Enum.AutomaticSize.Y
             ColContent.BackgroundTransparency = 1
             ColContent.ZIndex = 23
@@ -3214,9 +3215,10 @@ end
                 SubIcon = Instance.new("ImageLabel")
                 SubIcon.Name = "SubIcon"
                 SubIcon.Active = false
-                SubIcon.Size = UDim2.new(0, 14, 0, 14)
+                SubIcon.Size = UDim2.new(0, 16, 0, 16)
                 SubIcon.BackgroundTransparency = 1
                 SubIcon.Image = resolvedSubIcon
+                SubIcon.ScaleType = Enum.ScaleType.Fit
                 SubIcon.ImageColor3 = Color3.fromRGB(130, 135, 150)
                 SubIcon.ZIndex = 27
                 SubIcon.Parent = SubBtn
