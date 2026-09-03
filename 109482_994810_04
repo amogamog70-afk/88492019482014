@@ -33,6 +33,101 @@ end
 local DeadHub = {}
 DeadHub.__index = DeadHub
 
+-- Pre-configured Icons Dictionary (Direct asset IDs mapped by user)
+DeadHub.Icons = {
+    Combat = "rbxassetid://125143421594685",
+    Aim = "rbxassetid://125143421594685",
+    Aimbot = "rbxassetid://125143421594685",
+    Triggerbot = "rbxassetid://108279909361079",
+    Trigger = "rbxassetid://108279909361079",
+    World = "rbxassetid://96232528933854",
+    Worold = "rbxassetid://96232528933854",
+    ESP = "rbxassetid://125516540541120",
+    Player = "rbxassetid://84681188457139",
+    Movement = "rbxassetid://140301041058153",
+    Move = "rbxassetid://140301041058153",
+    Visuals = "rbxassetid://84681188457139",
+    Chams = "rbxassetid://18155310766",
+    Weapons = "rbxassetid://116520728661629",
+    Weapon = "rbxassetid://116520728661629",
+    WeaponMods = "rbxassetid://129538899181716",
+    Auto = "rbxassetid://12690726311",
+    Misc = "rbxassetid://8622237899",
+    Settings = "rbxassetid://8622237899"
+}
+
+local defaultTabIcons = {
+    ["aim"] = "125143421594685",
+    ["aimbot"] = "125143421594685",
+    ["combat"] = "125143421594685",
+    ["triggerbot"] = "108279909361079",
+    ["trigger"] = "108279909361079",
+    ["worold"] = "96232528933854",
+    ["world"] = "96232528933854",
+    ["esp"] = "125516540541120",
+    ["player"] = "84681188457139",
+    ["movement"] = "140301041058153",
+    ["move"] = "140301041058153",
+    ["visuals"] = "84681188457139",
+    ["chams"] = "18155310766",
+    ["weapons"] = "116520728661629",
+    ["weapon"] = "116520728661629",
+    ["weapon mods"] = "129538899181716",
+    ["weaponmods"] = "129538899181716",
+    ["auto"] = "12690726311",
+    ["misc"] = "8622237899",
+    ["miscellaneous"] = "8622237899",
+    ["settings"] = "8622237899"
+}
+
+-- Universal Icon Resolver: accepts number IDs, string IDs, rbxassetid URLs, or preset names
+local function resolveIcon(iconInput, fallbackName)
+    if iconInput == false then return nil end
+
+    if not iconInput and fallbackName then
+        local rawStr = string.lower(tostring(fallbackName))
+        local key = rawStr:gsub("%s+", "")
+        local found = defaultTabIcons[rawStr] or defaultTabIcons[key]
+        if found then
+            return "rbxassetid://" .. tostring(found):gsub("%D", "")
+        end
+        return nil
+    end
+
+    if not iconInput then return nil end
+
+    if type(iconInput) == "number" then
+        return "rbxassetid://" .. tostring(math.floor(iconInput))
+    end
+
+    local str = tostring(iconInput)
+    if str:find("rbxassetid://") or str:find("http://") or str:find("https://") or str:find("rbxasset://") then
+        return str
+    end
+
+    if str:match("^%d+$") then
+        return "rbxassetid://" .. str
+    end
+
+    local rawStr = string.lower(str)
+    local key = rawStr:gsub("%s+", "")
+    local found = defaultTabIcons[rawStr] or defaultTabIcons[key]
+    if found then
+        return "rbxassetid://" .. tostring(found):gsub("%D", "")
+    end
+
+    local digits = str:gsub("%D", "")
+    if #digits > 5 then
+        return "rbxassetid://" .. digits
+    end
+
+    return nil
+end
+
+function DeadHub:GetIcon(identifier)
+    return resolveIcon(identifier)
+end
+
 function DeadHub:CreateWindow(config)
     config = config or {}
     local windowTitle = config.Title or config.Name or '<font color="#e63946">Dead</font>Hub'
@@ -1845,22 +1940,8 @@ end
         removeKeybindEntry(id)
     end
 
-    -- Default Tab Icons Mapping (Mapped by user-provided asset IDs)
-    local defaultTabIcons = {
-        ["aim"] = "125143421594685",
-        ["combat"] = "125143421594685",
-        ["worold"] = "96232528933854",
-        ["world"] = "96232528933854",
-        ["esp"] = "125516540541120",
-        ["player"] = "84681188457139",
-        ["movement"] = "140301041058153",
-        ["move"] = "140301041058153",
-        ["visuals"] = "84681188457139",
-        ["chams"] = "84681188457139",
-        ["auto"] = "12690726311",
-        ["misc"] = "8622237899",
-        ["miscellaneous"] = "8622237899"
-    }
+    Window.Icons = DeadHub.Icons
+    Window.GetIcon = DeadHub.GetIcon
 
     -- Tabs and Pages Controller
     local tabsList = {}
@@ -1871,8 +1952,7 @@ end
         tabCount += 1
         local tabIndex = tabCount
 
-        local resolvedIcon = customIcon or defaultTabIcons[string.lower(tostring(tabName))]
-        local iconAsset = resolvedIcon and ("rbxassetid://" .. tostring(resolvedIcon):gsub("%D", "")) or nil
+        local iconAsset = resolveIcon(customIcon, tabName)
 
         -- 1. Tab Button in Sidebar
         local TabBtn = Instance.new("Frame")
@@ -2099,7 +2179,7 @@ end
             return subtabsBar
         end
 
-        local function createColumnInternal(targetScroll, colTitle)
+        local function createColumnInternal(targetScroll, colTitle, customIcon)
             local ColCard = Instance.new("Frame")
             ColCard.Name = "Col_" .. colTitle
             ColCard.Active = false
@@ -2125,11 +2205,25 @@ end
             ColHeader.ZIndex = 23
             ColHeader.Parent = ColCard
 
+            local colIconAsset = resolveIcon(customIcon)
+            if colIconAsset then
+                local ColIcon = Instance.new("ImageLabel")
+                ColIcon.Name = "ColIcon"
+                ColIcon.Active = false
+                ColIcon.Size = UDim2.new(0, 14, 0, 14)
+                ColIcon.Position = UDim2.new(0, 10, 0.5, -7)
+                ColIcon.BackgroundTransparency = 1
+                ColIcon.Image = colIconAsset
+                ColIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
+                ColIcon.ZIndex = 24
+                ColIcon.Parent = ColHeader
+            end
+
             local ColHeaderText = Instance.new("TextLabel")
             ColHeaderText.Name = "ColHeaderText"
             ColHeaderText.Active = false
-            ColHeaderText.Size = UDim2.new(1, -24, 1, 0)
-            ColHeaderText.Position = UDim2.new(0, 12, 0, 0)
+            ColHeaderText.Size = colIconAsset and UDim2.new(1, -38, 1, 0) or UDim2.new(1, -24, 1, 0)
+            ColHeaderText.Position = colIconAsset and UDim2.new(0, 30, 0, 0) or UDim2.new(0, 12, 0, 0)
             ColHeaderText.BackgroundTransparency = 1
             ColHeaderText.Font = ThemeFontBold
             ColHeaderText.Text = colTitle
@@ -2382,29 +2476,56 @@ end
                 return toggleObj
             end
 
-            -- 2. Add Button (Classic sharp button)
-            function Column:AddButton(btnName, callback)
+            -- 2. Add Button (Modern button with optional icon)
+            function Column:AddButton(btnName, callback, customIcon)
                 callback = callback or function() end
+                local btnIconAsset = resolveIcon(customIcon)
+
+                local Row = Instance.new("Frame")
+                Row.Name = "ButtonRow_" .. btnName
+                Row.Active = false
+                Row.Size = UDim2.new(1, 0, 0, 30)
+                Row.BackgroundTransparency = 1
+                Row.ZIndex = 24
+                Row.Parent = ColContent
 
                 local BtnFrame = Instance.new("Frame")
-                BtnFrame.Name = "Btn_" .. btnName
+                BtnFrame.Name = "BtnFrame"
                 BtnFrame.Active = false
-                BtnFrame.Size = UDim2.new(1, 0, 0, 28)
+                BtnFrame.Size = UDim2.new(1, 0, 1, 0)
                 BtnFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
                 BtnFrame.BorderSizePixel = 0
                 BtnFrame.ZIndex = 24
-                BtnFrame.Parent = ColContent
+                BtnFrame.Parent = Row
+
+                local BtnCorner = Instance.new("UICorner")
+                BtnCorner.CornerRadius = UDim.new(0, 3)
+                BtnCorner.Parent = BtnFrame
 
                 local BtnStroke = Instance.new("UIStroke")
                 BtnStroke.Thickness = 1
-                BtnStroke.Color = Color3.fromRGB(46, 50, 62)
+                BtnStroke.Color = Color3.fromRGB(44, 46, 56)
                 BtnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 BtnStroke.Parent = BtnFrame
+
+                if btnIconAsset then
+                    local BtnIcon = Instance.new("ImageLabel")
+                    BtnIcon.Name = "BtnIcon"
+                    BtnIcon.Active = false
+                    BtnIcon.Size = UDim2.new(0, 14, 0, 14)
+                    BtnIcon.Position = UDim2.new(0, 10, 0.5, -7)
+                    BtnIcon.BackgroundTransparency = 1
+                    BtnIcon.Image = btnIconAsset
+                    BtnIcon.ImageColor3 = Color3.fromRGB(225, 230, 240)
+                    BtnIcon.ZIndex = 25
+                    BtnIcon.Parent = BtnFrame
+                end
 
                 local BtnLabel = Instance.new("TextLabel")
                 BtnLabel.Name = "BtnLabel"
                 BtnLabel.Active = false
-                BtnLabel.Size = UDim2.new(1, 0, 1, 0)
+                BtnLabel.Size = btnIconAsset and UDim2.new(1, -28, 1, 0) or UDim2.new(1, 0, 1, 0)
+                BtnLabel.Position = btnIconAsset and UDim2.new(0, 24, 0, 0) or UDim2.new(0, 0, 0, 0)
                 BtnLabel.BackgroundTransparency = 1
                 BtnLabel.Font = ThemeFontBold
                 BtnLabel.Text = btnName
@@ -2735,31 +2856,21 @@ end
             return Column
         end
 
-        function Tab:CreateColumn(colTitle, side)
+        function Tab:CreateColumn(colTitle, side, customIcon)
             colCount += 1
             local targetScroll = LeftScroll
             if side == "right" or (side == nil and colCount % 2 == 0) then
                 targetScroll = RightScroll
             end
-            return createColumnInternal(targetScroll, colTitle)
+            return createColumnInternal(targetScroll, colTitle, customIcon)
         end
 
         function Tab:CreateSubTab(subTabName, customIcon)
             local bar = getOrCreateSubtabsBar()
             local subIndex = #subtabsList + 1
 
-            -- Resolve subtab icon (custom passed, or automatic lookup by name, or false to disable)
-            local resolvedSubIcon = nil
-            if customIcon ~= false then
-                if type(customIcon) == "string" or type(customIcon) == "number" then
-                    resolvedSubIcon = "rbxassetid://" .. tostring(customIcon):gsub("%D", "")
-                else
-                    local lookup = defaultTabIcons[string.lower(tostring(subTabName))]
-                    if lookup then
-                        resolvedSubIcon = "rbxassetid://" .. tostring(lookup):gsub("%D", "")
-                    end
-                end
-            end
+            -- Universal icon resolution (custom passed ID, preset name, or automatic lookup by name)
+            local resolvedSubIcon = resolveIcon(customIcon, subTabName)
 
             -- SubTab Button (Segmented pill button inside top bar)
             local SubBtn = Instance.new("Frame")
@@ -2938,13 +3049,13 @@ end
             local SubTab = {}
             local subColCount = 0
 
-            function SubTab:CreateColumn(colTitle, side)
+            function SubTab:CreateColumn(colTitle, side, customIcon)
                 subColCount += 1
                 local target = SubLeftScroll
                 if side == "right" or (side == nil and subColCount % 2 == 0) then
                     target = SubRightScroll
                 end
-                return createColumnInternal(target, colTitle)
+                return createColumnInternal(target, colTitle, customIcon)
             end
 
             return SubTab
