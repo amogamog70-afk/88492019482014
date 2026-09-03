@@ -2216,6 +2216,8 @@ local ColorPicker = (function()
         Close = close,
         HandleClick = handleClick,
         HandleDrag = handleDrag,
+        EndDrag = function() activeColorDrag = nil end,
+        IsDragging = function() return activeColorDrag ~= nil end
     }
 end)()
 
@@ -3143,7 +3145,9 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
             activeGraphDrag.finish()
             activeGraphDrag = nil
         end
-        ColorPicker.EndDrag()
+        if ColorPicker and ColorPicker.EndDrag then
+            pcall(ColorPicker.EndDrag)
+        end
     elseif not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
         -- Handle Release for Hold mode keybinds
         for _, item in ipairs(rightClickRegistry) do
@@ -4809,13 +4813,15 @@ end
                 }
             end
 
-            -- 8. Add Hitbox Body Selector (Neverlose Mannequin Silhouette)
+            -- 8. Add Hitbox Selector (Neverlose-style Hitbox Matrix with Quick Presets)
             function Column:AddHitboxSelector(hsTitle, defaultHitboxes, callback)
                 hsTitle = hsTitle or "Target Hitboxes"
                 callback = callback or function() end
 
+                local hitboxNames = {"Head", "Neck", "Chest", "Stomach", "Arms", "Legs"}
                 local activeParts = {
                     Head = false,
+                    Neck = false,
                     Chest = false,
                     Stomach = false,
                     Arms = false,
@@ -4835,16 +4841,24 @@ end
                 local Row = Instance.new("Frame")
                 Row.Name = "HSRow_" .. hsTitle
                 Row.Active = false
-                Row.Size = UDim2.new(1, 0, 0, 146)
+                Row.Size = UDim2.new(1, 0, 0, 122)
                 Row.BackgroundTransparency = 1
                 Row.ZIndex = 24
                 Row.Parent = ColContent
 
+                -- Header: Title on Left, Presets on Right
+                local HeaderFrame = Instance.new("Frame")
+                HeaderFrame.Name = "Header"
+                HeaderFrame.Active = false
+                HeaderFrame.Size = UDim2.new(1, 0, 0, 18)
+                HeaderFrame.BackgroundTransparency = 1
+                HeaderFrame.ZIndex = 25
+                HeaderFrame.Parent = Row
+
                 local Label = Instance.new("TextLabel")
                 Label.Name = "Label"
                 Label.Active = false
-                Label.Size = UDim2.new(1, 0, 0, 18)
-                Label.Position = UDim2.new(0, 0, 0, 0)
+                Label.Size = UDim2.new(0.5, 0, 1, 0)
                 Label.BackgroundTransparency = 1
                 Label.Font = ThemeFont
                 Label.Text = hsTitle
@@ -4853,14 +4867,23 @@ end
                 Label.TextXAlignment = Enum.TextXAlignment.Left
                 Label.TextYAlignment = Enum.TextYAlignment.Center
                 Label.ZIndex = 25
-                Label.Parent = Row
+                Label.Parent = HeaderFrame
+
+                local PresetsContainer = Instance.new("Frame")
+                PresetsContainer.Name = "Presets"
+                PresetsContainer.Active = false
+                PresetsContainer.Size = UDim2.new(0.5, 0, 1, 0)
+                PresetsContainer.Position = UDim2.new(0.5, 0, 0, 0)
+                PresetsContainer.BackgroundTransparency = 1
+                PresetsContainer.ZIndex = 25
+                PresetsContainer.Parent = HeaderFrame
 
                 local Container = Instance.new("Frame")
                 Container.Name = "Container"
                 Container.Active = false
-                Container.Size = UDim2.new(1, 0, 0, 122)
+                Container.Size = UDim2.new(1, 0, 0, 98)
                 Container.Position = UDim2.new(0, 0, 0, 22)
-                Container.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+                Container.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
                 Container.BorderSizePixel = 0
                 Container.ZIndex = 25
                 Container.Parent = Row
@@ -4875,130 +4898,200 @@ end
                 cStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 cStroke.Parent = Container
 
-                local MannequinArea = Instance.new("Frame")
-                MannequinArea.Name = "MannequinArea"
-                MannequinArea.Active = false
-                MannequinArea.Size = UDim2.new(0, 110, 0, 96)
-                MannequinArea.Position = UDim2.new(0.5, -55, 0, 6)
-                MannequinArea.BackgroundTransparency = 1
-                MannequinArea.ZIndex = 26
-                MannequinArea.Parent = Container
+                local partChips = {}
 
                 local Readout = Instance.new("TextLabel")
                 Readout.Name = "Readout"
                 Readout.Active = false
                 Readout.Size = UDim2.new(1, -12, 0, 14)
-                Readout.Position = UDim2.new(0, 6, 1, -16)
+                Readout.Position = UDim2.new(0, 8, 1, -17)
                 Readout.BackgroundTransparency = 1
                 Readout.Font = ThemeFont
                 Readout.TextSize = 10
                 Readout.TextColor3 = Color3.fromRGB(150, 155, 170)
-                Readout.TextXAlignment = Enum.TextXAlignment.Center
+                Readout.TextXAlignment = Enum.TextXAlignment.Left
                 Readout.TextYAlignment = Enum.TextYAlignment.Center
                 Readout.ZIndex = 26
                 Readout.Parent = Container
 
-                local partVisuals = {}
-
-                local function updateReadout()
-                    local list = {}
-                    if activeParts.Head then table.insert(list, "Head") end
-                    if activeParts.Chest then table.insert(list, "Chest") end
-                    if activeParts.Stomach then table.insert(list, "Stomach") end
-                    if activeParts.Arms then table.insert(list, "Arms") end
-                    if activeParts.Legs then table.insert(list, "Legs") end
-                    if #list == 0 then
-                        Readout.Text = "Selected: None"
-                    elseif #list == 5 then
-                        Readout.Text = "Selected: All Hitboxes"
+                local function refreshAllChips()
+                    local activeList = {}
+                    for _, pName in ipairs(hitboxNames) do
+                        local isSel = (activeParts[pName] == true)
+                        if isSel then table.insert(activeList, pName) end
+                        local chip = partChips[pName]
+                        if chip then
+                            chip.frame.BackgroundColor3 = isSel and Color3.fromRGB(38, 22, 26) or Color3.fromRGB(25, 25, 30)
+                            chip.stroke.Color = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(42, 44, 54)
+                            chip.dot.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(60, 64, 76)
+                            chip.text.TextColor3 = isSel and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 155, 170)
+                            chip.text.Font = isSel and ThemeFontBold or ThemeFont
+                        end
+                    end
+                    if #activeList == 0 then
+                        Readout.Text = "Active: None (0/6)"
+                    elseif #activeList == #hitboxNames then
+                        Readout.Text = "Active: All Hitboxes (6/6)"
                     else
-                        Readout.Text = "Selected: " .. table.concat(list, ", ")
+                        Readout.Text = "Active: " .. table.concat(activeList, ", ") .. string.format(" (%d/6)", #activeList)
                     end
                 end
 
-                local function createBodyPart(pName, sizeW, sizeH, posX, posY, cornerRadius, linkedPartKey)
-                    local frame = Instance.new("Frame")
-                    frame.Name = "Part_" .. pName
-                    frame.Active = false
-                    frame.Size = UDim2.new(0, sizeW, 0, sizeH)
-                    frame.Position = UDim2.new(0, posX, 0, posY)
-                    frame.BackgroundColor3 = Color3.fromRGB(28, 30, 38)
-                    frame.BorderSizePixel = 0
-                    frame.ZIndex = 27
-                    frame.Parent = MannequinArea
+                -- Create 3 Quick Presets: [ All ] [ Head ] [ Clear ]
+                local function createPresetBtn(btnText, posX, onClickFn)
+                    local pBtn = Instance.new("Frame")
+                    pBtn.Name = "P_" .. btnText
+                    pBtn.Active = false
+                    pBtn.Size = UDim2.new(0, 36, 0, 16)
+                    pBtn.Position = UDim2.new(1, posX, 0.5, -8)
+                    pBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+                    pBtn.BorderSizePixel = 0
+                    pBtn.ZIndex = 26
+                    pBtn.Parent = PresetsContainer
 
-                    local corner = Instance.new("UICorner")
-                    corner.CornerRadius = UDim.new(0, cornerRadius)
-                    corner.Parent = frame
+                    local pCorner = Instance.new("UICorner")
+                    pCorner.CornerRadius = UDim.new(0, 3)
+                    pCorner.Parent = pBtn
 
-                    local stroke = Instance.new("UIStroke")
-                    stroke.Thickness = 1
-                    stroke.Color = Color3.fromRGB(48, 52, 66)
-                    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-                    stroke.Parent = frame
+                    local pStroke = Instance.new("UIStroke")
+                    pStroke.Thickness = 1
+                    pStroke.Color = Color3.fromRGB(44, 46, 56)
+                    pStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                    pStroke.Parent = pBtn
 
-                    local visualData = {
-                        frame = frame,
-                        stroke = stroke,
-                        key = linkedPartKey
-                    }
-                    table.insert(partVisuals, visualData)
-
-                    local function refresh()
-                        local isSel = (activeParts[linkedPartKey] == true)
-                        frame.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(28, 30, 38)
-                        stroke.Color = isSel and Color3.fromRGB(255, 95, 110) or Color3.fromRGB(48, 52, 66)
-                    end
+                    local pLbl = Instance.new("TextLabel")
+                    pLbl.Name = "Text"
+                    pLbl.Active = false
+                    pLbl.Size = UDim2.new(1, 0, 1, 0)
+                    pLbl.BackgroundTransparency = 1
+                    pLbl.Font = ThemeFont
+                    pLbl.Text = btnText
+                    pLbl.TextSize = 9
+                    pLbl.TextColor3 = Color3.fromRGB(170, 175, 190)
+                    pLbl.TextXAlignment = Enum.TextXAlignment.Center
+                    pLbl.TextYAlignment = Enum.TextYAlignment.Center
+                    pLbl.ZIndex = 27
+                    pLbl.Parent = pBtn
 
                     table.insert(clickableRegistry, {
-                        object = frame,
+                        object = pBtn,
                         onClick = function()
-                            activeParts[linkedPartKey] = not activeParts[linkedPartKey]
-                            for _, p in ipairs(partVisuals) do
-                                if p.key == linkedPartKey then
-                                    local isSel = activeParts[linkedPartKey]
-                                    p.frame.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(28, 30, 38)
-                                    p.stroke.Color = isSel and Color3.fromRGB(255, 95, 110) or Color3.fromRGB(48, 52, 66)
-                                end
-                            end
-                            updateReadout()
+                            onClickFn()
+                            refreshAllChips()
                             pcall(callback, activeParts)
                         end,
                         onHover = function(isHov)
-                            local isSel = (activeParts[linkedPartKey] == true)
+                            TweenService:Create(pStroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                                Color = isHov and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(44, 46, 56)
+                            }):Play()
+                            TweenService:Create(pLbl, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                                TextColor3 = isHov and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(170, 175, 190)
+                            }):Play()
+                        end
+                    })
+                end
+
+                createPresetBtn("Clear", -36, function()
+                    for _, p in ipairs(hitboxNames) do activeParts[p] = false end
+                end)
+                createPresetBtn("Head", -76, function()
+                    for _, p in ipairs(hitboxNames) do activeParts[p] = (p == "Head") end
+                end)
+                createPresetBtn("All", -116, function()
+                    for _, p in ipairs(hitboxNames) do activeParts[p] = true end
+                end)
+
+                -- Create 3x2 Grid of Hitbox Chips inside Container
+                local colWidth = 0.315
+                local colGap = 0.025
+                local rowHeight = 26
+                local startY = 8
+
+                for idx, pName in ipairs(hitboxNames) do
+                    local col = (idx - 1) % 3
+                    local row = math.floor((idx - 1) / 3)
+
+                    local chip = Instance.new("Frame")
+                    chip.Name = "Chip_" .. pName
+                    chip.Active = false
+                    chip.Size = UDim2.new(colWidth, -4, 0, rowHeight)
+                    chip.Position = UDim2.new(col * (colWidth + colGap) + 0.015, 2, 0, startY + row * (rowHeight + 6))
+                    chip.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+                    chip.BorderSizePixel = 0
+                    chip.ZIndex = 26
+                    chip.Parent = Container
+
+                    local chCorner = Instance.new("UICorner")
+                    chCorner.CornerRadius = UDim.new(0, 3)
+                    chCorner.Parent = chip
+
+                    local chStroke = Instance.new("UIStroke")
+                    chStroke.Thickness = 1
+                    chStroke.Color = Color3.fromRGB(42, 44, 54)
+                    chStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                    chStroke.Parent = chip
+
+                    local chDot = Instance.new("Frame")
+                    chDot.Name = "Dot"
+                    chDot.Active = false
+                    chDot.Size = UDim2.new(0, 6, 0, 6)
+                    chDot.Position = UDim2.new(0, 8, 0.5, -3)
+                    chDot.BackgroundColor3 = Color3.fromRGB(60, 64, 76)
+                    chDot.BorderSizePixel = 0
+                    chDot.ZIndex = 27
+                    chDot.Parent = chip
+
+                    local dotCorner = Instance.new("UICorner")
+                    dotCorner.CornerRadius = UDim.new(0, 3)
+                    dotCorner.Parent = chDot
+
+                    local chText = Instance.new("TextLabel")
+                    chText.Name = "Text"
+                    chText.Active = false
+                    chText.Size = UDim2.new(1, -20, 1, 0)
+                    chText.Position = UDim2.new(0, 18, 0, 0)
+                    chText.BackgroundTransparency = 1
+                    chText.Font = ThemeFont
+                    chText.Text = pName
+                    chText.TextSize = 11
+                    chText.TextColor3 = Color3.fromRGB(150, 155, 170)
+                    chText.TextXAlignment = Enum.TextXAlignment.Left
+                    chText.TextYAlignment = Enum.TextYAlignment.Center
+                    chText.ZIndex = 27
+                    chText.Parent = chip
+
+                    partChips[pName] = {
+                        frame = chip,
+                        stroke = chStroke,
+                        dot = chDot,
+                        text = chText
+                    }
+
+                    table.insert(clickableRegistry, {
+                        object = chip,
+                        onClick = function()
+                            activeParts[pName] = not activeParts[pName]
+                            refreshAllChips()
+                            pcall(callback, activeParts)
+                        end,
+                        onHover = function(isHov)
+                            local isSel = (activeParts[pName] == true)
                             if not isSel then
-                                frame.BackgroundColor3 = isHov and Color3.fromRGB(38, 42, 54) or Color3.fromRGB(28, 30, 38)
-                                stroke.Color = isHov and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(48, 52, 66)
+                                chip.BackgroundColor3 = isHov and Color3.fromRGB(30, 32, 40) or Color3.fromRGB(25, 25, 30)
+                                chStroke.Color = isHov and Color3.fromRGB(65, 72, 90) or Color3.fromRGB(42, 44, 54)
+                                chText.TextColor3 = isHov and Color3.fromRGB(210, 215, 230) or Color3.fromRGB(150, 155, 170)
                             end
                         end
                     })
-
-                    refresh()
-                    return frame
                 end
 
-                createBodyPart("Head", 20, 20, 45, 2, 10, "Head")
-                createBodyPart("Chest", 34, 22, 38, 25, 3, "Chest")
-                createBodyPart("Stomach", 28, 16, 41, 50, 3, "Stomach")
-                createBodyPart("LeftArm", 11, 38, 23, 25, 3, "Arms")
-                createBodyPart("RightArm", 11, 38, 76, 25, 3, "Arms")
-                createBodyPart("LeftLeg", 13, 34, 40, 69, 3, "Legs")
-                createBodyPart("RightLeg", 13, 34, 57, 69, 3, "Legs")
-
-                updateReadout()
+                refreshAllChips()
 
                 return {
                     Set = function(self, partKey, state)
                         if activeParts[partKey] ~= nil then
                             activeParts[partKey] = (state == true)
-                            for _, p in ipairs(partVisuals) do
-                                if p.key == partKey then
-                                    local isSel = activeParts[partKey]
-                                    p.frame.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(28, 30, 38)
-                                    p.stroke.Color = isSel and Color3.fromRGB(255, 95, 110) or Color3.fromRGB(48, 52, 66)
-                                end
-                            end
-                            updateReadout()
+                            refreshAllChips()
                             pcall(callback, activeParts)
                         end
                     end,
@@ -5127,22 +5220,16 @@ end
                     local node = Instance.new("Frame")
                     node.Name = "Node_" .. tostring(i)
                     node.Active = false
-                    node.Size = UDim2.new(0, 10, 0, 10)
+                    node.Size = UDim2.new(0, 8, 0, 8)
                     node.AnchorPoint = Vector2.new(0.5, 0.5)
-                    node.BackgroundColor3 = Color3.fromRGB(240, 240, 250)
+                    node.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
                     node.BorderSizePixel = 0
                     node.ZIndex = 28
                     node.Parent = Canvas
 
                     local nCorner = Instance.new("UICorner")
-                    nCorner.CornerRadius = UDim.new(0, 5)
+                    nCorner.CornerRadius = UDim.new(0, 4)
                     nCorner.Parent = node
-
-                    local nStroke = Instance.new("UIStroke")
-                    nStroke.Thickness = 2
-                    nStroke.Color = Color3.fromRGB(230, 57, 70)
-                    nStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-                    nStroke.Parent = node
 
                     nodeFrames[i] = node
                 end
@@ -5162,7 +5249,15 @@ end
                         local py = cSize.Y - (padY + normY * h)
                         pixelPositions[i] = Vector2.new(px, py)
 
-                        nodeFrames[i].Position = UDim2.fromOffset(px, py)
+                        local node = nodeFrames[i]
+                        node.Position = UDim2.fromOffset(px, py)
+                        if activePointIdx == i then
+                            node.BackgroundColor3 = Color3.fromRGB(230, 57, 70)
+                            node.Size = UDim2.new(0, 10, 0, 10)
+                        else
+                            node.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                            node.Size = UDim2.new(0, 8, 0, 8)
+                        end
                     end
 
                     for i = 1, #points - 1 do
@@ -5240,7 +5335,10 @@ end
                         activePointIdx = nearestIdx
                         activeGraphDrag = {
                             update = handleGraphDrag,
-                            finish = function() activePointIdx = nil end
+                            finish = function()
+                                activePointIdx = nil
+                                renderGraph()
+                            end
                         }
                         handleGraphDrag(clickX, clickY)
                     end,
