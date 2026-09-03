@@ -1622,6 +1622,41 @@ local ColorPicker = (function()
     svCursorStroke.Color = Color3.fromRGB(255, 255, 255)
     svCursorStroke.Parent = SVCursor
 
+    local function createCheckerboard(parent, width, height, squareSize, zindex)
+        local bg = Instance.new("Frame")
+        bg.Name = "Checkerboard"
+        bg.Active = false
+        bg.Size = UDim2.new(1, 0, 1, 0)
+        bg.BackgroundColor3 = Color3.fromRGB(245, 245, 250)
+        bg.BorderSizePixel = 0
+        bg.ClipsDescendants = true
+        bg.ZIndex = zindex
+        bg.Parent = parent
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 3)
+        c.Parent = bg
+
+        local cols = math.ceil(width / squareSize)
+        local rows = math.ceil(height / squareSize)
+
+        for r = 0, rows - 1 do
+            for col = 0, cols - 1 do
+                if (r + col) % 2 == 1 then
+                    local sq = Instance.new("Frame")
+                    sq.Active = false
+                    sq.Size = UDim2.fromOffset(squareSize, squareSize)
+                    sq.Position = UDim2.fromOffset(col * squareSize, r * squareSize)
+                    sq.BackgroundColor3 = Color3.fromRGB(190, 195, 205)
+                    sq.BorderSizePixel = 0
+                    sq.ZIndex = zindex
+                    sq.Parent = bg
+                end
+            end
+        end
+        return bg
+    end
+
     -- 2. Middle Section: Preview Box & Sliders
     local PreviewBox = Instance.new("Frame")
     PreviewBox.Name = "PreviewBox"
@@ -1642,6 +1677,8 @@ local ColorPicker = (function()
     prevStroke.Color = Color3.fromRGB(44, 46, 56)
     prevStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     prevStroke.Parent = PreviewBox
+
+    createCheckerboard(PreviewBox, 28, 28, 7, 251)
 
     local PreviewColor = Instance.new("Frame")
     PreviewColor.Name = "PreviewColor"
@@ -1692,7 +1729,7 @@ local ColorPicker = (function()
     local HueThumb = Instance.new("Frame")
     HueThumb.Name = "HueThumb"
     HueThumb.Active = false
-    HueThumb.Size = UDim2.new(0, 4, 1, 4)
+    HueThumb.Size = UDim2.new(0, 5, 1, 4)
     HueThumb.AnchorPoint = Vector2.new(0.5, 0.5)
     HueThumb.Position = UDim2.new(curH, 0, 0.5, 0)
     HueThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1701,16 +1738,16 @@ local ColorPicker = (function()
     HueThumb.Parent = HueBar
 
     local hueThumbCorner = Instance.new("UICorner")
-    hueThumbCorner.CornerRadius = UDim.new(0, 2)
+    hueThumbCorner.CornerRadius = UDim.new(0, 3)
     hueThumbCorner.Parent = HueThumb
 
     local hueThumbStroke = Instance.new("UIStroke")
     hueThumbStroke.Thickness = 1
-    hueThumbStroke.Color = Color3.fromRGB(20, 20, 24)
+    hueThumbStroke.Color = Color3.fromRGB(24, 24, 28)
     hueThumbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     hueThumbStroke.Parent = HueThumb
 
-    -- Alpha Slider Bar
+    -- Alpha Slider Bar with Checkered Transparency Background
     local AlphaBar = Instance.new("Frame")
     AlphaBar.Name = "AlphaBar"
     AlphaBar.Active = false
@@ -1730,6 +1767,8 @@ local ColorPicker = (function()
     alphaStroke.Color = Color3.fromRGB(36, 38, 46)
     alphaStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     alphaStroke.Parent = AlphaBar
+
+    createCheckerboard(AlphaBar, 160, 12, 6, 251)
 
     local AlphaColorLayer = Instance.new("Frame")
     AlphaColorLayer.Name = "AlphaColorLayer"
@@ -1755,7 +1794,7 @@ local ColorPicker = (function()
     local AlphaThumb = Instance.new("Frame")
     AlphaThumb.Name = "AlphaThumb"
     AlphaThumb.Active = false
-    AlphaThumb.Size = UDim2.new(0, 4, 1, 4)
+    AlphaThumb.Size = UDim2.new(0, 5, 1, 4)
     AlphaThumb.AnchorPoint = Vector2.new(0.5, 0.5)
     AlphaThumb.Position = UDim2.new(curA, 0, 0.5, 0)
     AlphaThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1764,12 +1803,12 @@ local ColorPicker = (function()
     AlphaThumb.Parent = AlphaBar
 
     local alphaThumbCorner = Instance.new("UICorner")
-    alphaThumbCorner.CornerRadius = UDim.new(0, 2)
+    alphaThumbCorner.CornerRadius = UDim.new(0, 3)
     alphaThumbCorner.Parent = AlphaThumb
 
     local alphaThumbStroke = Instance.new("UIStroke")
     alphaThumbStroke.Thickness = 1
-    alphaThumbStroke.Color = Color3.fromRGB(20, 20, 24)
+    alphaThumbStroke.Color = Color3.fromRGB(24, 24, 28)
     alphaThumbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     alphaThumbStroke.Parent = AlphaThumb
 
