@@ -1365,6 +1365,10 @@ local function toggleMenu(show)
             ColorPicker.Close()
         end
 
+        if DropdownOverlay then
+            DropdownOverlay.Close()
+        end
+
         if isListeningMenuKey then
             isListeningMenuKey = false
             updateMenuKeyUI()
@@ -1525,6 +1529,7 @@ end
 
 -- Interactive Zero-GPE Component Variables
 local activeSlider = nil
+local activeGraphDrag = nil
 local activeContextItem = nil
 local isListeningKeybind = false
 
@@ -2211,8 +2216,319 @@ local ColorPicker = (function()
         Close = close,
         HandleClick = handleClick,
         HandleDrag = handleDrag,
-        EndDrag = function() activeColorDrag = nil end,
-        IsDragging = function() return activeColorDrag ~= nil end
+    }
+end)()
+
+-- Dropdown & Multiselect Overlay Module (Zero-GPE, Encapsulated)
+local DropdownOverlay = (function()
+    local Window = Instance.new("Frame")
+    Window.Name = "DH_DropdownPopup"
+    Window.Active = false
+    Window.Visible = false
+    Window.Size = UDim2.new(0, 160, 0, 100)
+    Window.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+    Window.BorderSizePixel = 0
+    Window.ZIndex = 600
+    Window.ClipsDescendants = true
+    Window.Parent = ScreenGui
+
+    local wCorner = Instance.new("UICorner")
+    wCorner.CornerRadius = UDim.new(0, 4)
+    wCorner.Parent = Window
+
+    local wStroke = Instance.new("UIStroke")
+    wStroke.Thickness = 1
+    wStroke.Color = Color3.fromRGB(44, 46, 56)
+    wStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    wStroke.Parent = Window
+
+    local Scroll = Instance.new("ScrollingFrame")
+    Scroll.Name = "Scroll"
+    Scroll.Active = false
+    Scroll.Size = UDim2.new(1, 0, 1, 0)
+    Scroll.BackgroundTransparency = 1
+    Scroll.BorderSizePixel = 0
+    Scroll.ScrollBarThickness = 3
+    Scroll.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
+    Scroll.ScrollBarImageTransparency = 0
+    Scroll.ClipsDescendants = true
+    Scroll.ZIndex = 601
+    Scroll.Parent = Window
+
+    local Layout = Instance.new("UIListLayout")
+    Layout.FillDirection = Enum.FillDirection.Vertical
+    Layout.SortOrder = Enum.SortOrder.LayoutOrder
+    Layout.Padding = UDim.new(0, 2)
+    Layout.Parent = Scroll
+
+    local Pad = Instance.new("UIPadding")
+    Pad.PaddingTop = UDim.new(0, 4)
+    Pad.PaddingBottom = UDim.new(0, 4)
+    Pad.PaddingLeft = UDim.new(0, 4)
+    Pad.PaddingRight = UDim.new(0, 4)
+    Pad.Parent = Scroll
+
+    local currentAnchor = nil
+    local currentList = {}
+    local isMulti = false
+    local currentVal = nil
+    local currentCallback = nil
+    local updateDisplayCb = nil
+    local items = {}
+
+    local function close()
+        Window.Visible = false
+        currentAnchor = nil
+        currentCallback = nil
+        updateDisplayCb = nil
+        for _, it in ipairs(items) do
+            if it.frame then pcall(function() it.frame:Destroy() end) end
+        end
+        items = {}
+    end
+
+    local function open(anchorObj, list, multiMode, initialVal, cb, dispCb)
+        if Window.Visible and currentAnchor == anchorObj then
+            close()
+            return
+        end
+
+        for _, it in ipairs(items) do
+            if it.frame then pcall(function() it.frame:Destroy() end) end
+        end
+        items = {}
+
+        currentAnchor = anchorObj
+        currentList = list or {}
+        isMulti = multiMode == true
+        currentCallback = cb
+        updateDisplayCb = dispCb
+
+        if isMulti then
+            currentVal = {}
+            if type(initialVal) == "table" then
+                for k, v in pairs(initialVal) do
+                    if type(k) == "number" then
+                        currentVal[v] = true
+                    elseif v == true then
+                        currentVal[k] = true
+                    end
+                end
+            end
+        else
+            currentVal = initialVal or currentList[1] or "None"
+        end
+
+        local rowH = 22
+        local count = #currentList
+        local targetH = math.clamp(count * (rowH + 2) + 8, 32, 140)
+
+        local ap = anchorObj.AbsolutePosition
+        local as = anchorObj.AbsoluteSize
+        local vp = getViewportSize()
+
+        local targetW = math.max(as.X, 150)
+        local targetX = math.clamp(ap.X, 8, math.max(8, vp.X - targetW - 8))
+        local targetY = ap.Y + as.Y + 4
+        if targetY + targetH > vp.Y - 8 then
+            targetY = math.clamp(ap.Y - targetH - 4, 8, vp.Y - 10)
+        end
+
+        Window.Size = UDim2.fromOffset(targetW, targetH)
+        Window.Position = UDim2.fromOffset(targetX, targetY)
+        Scroll.CanvasSize = UDim2.new(0, 0, 0, count * (rowH + 2) + 8)
+
+        for idx, optName in ipairs(currentList) do
+            local optRow = Instance.new("Frame")
+            optRow.Name = "Opt_" .. tostring(optName)
+            optRow.Active = false
+            optRow.Size = UDim2.new(1, 0, 0, rowH)
+            optRow.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+            optRow.BorderSizePixel = 0
+            optRow.ZIndex = 602
+            optRow.Parent = Scroll
+
+            local optCorner = Instance.new("UICorner")
+            optCorner.CornerRadius = UDim.new(0, 3)
+            optCorner.Parent = optRow
+
+            local optStroke = Instance.new("UIStroke")
+            optStroke.Thickness = 1
+            optStroke.Color = Color3.fromRGB(38, 40, 48)
+            optStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            optStroke.Parent = optRow
+
+            local optText = Instance.new("TextLabel")
+            optText.Name = "Text"
+            optText.Active = false
+            optText.BackgroundTransparency = 1
+            optText.Font = ThemeFont
+            optText.Text = tostring(optName)
+            optText.TextSize = 11
+            optText.TextXAlignment = Enum.TextXAlignment.Left
+            optText.TextYAlignment = Enum.TextYAlignment.Center
+            optText.ZIndex = 603
+            optText.Parent = optRow
+
+            if isMulti then
+                local checkIndicator = Instance.new("Frame")
+                checkIndicator.Name = "Check"
+                checkIndicator.Active = false
+                checkIndicator.Size = UDim2.new(0, 12, 0, 12)
+                checkIndicator.Position = UDim2.new(0, 6, 0.5, -6)
+                checkIndicator.BackgroundColor3 = Color3.fromRGB(30, 32, 38)
+                checkIndicator.BorderSizePixel = 0
+                checkIndicator.ZIndex = 603
+                checkIndicator.Parent = optRow
+
+                local cCorner = Instance.new("UICorner")
+                cCorner.CornerRadius = UDim.new(0, 2)
+                cCorner.Parent = checkIndicator
+
+                local cStroke = Instance.new("UIStroke")
+                cStroke.Thickness = 1
+                cStroke.Color = Color3.fromRGB(50, 54, 66)
+                cStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                cStroke.Parent = checkIndicator
+
+                local cMark = Instance.new("TextLabel")
+                cMark.Name = "Mark"
+                cMark.Active = false
+                cMark.Size = UDim2.new(1, 0, 1, 0)
+                cMark.BackgroundTransparency = 1
+                cMark.Font = ThemeFontBold
+                cMark.Text = "+"
+                cMark.TextSize = 10
+                cMark.TextColor3 = Color3.fromRGB(255, 255, 255)
+                cMark.TextXAlignment = Enum.TextXAlignment.Center
+                cMark.TextYAlignment = Enum.TextYAlignment.Center
+                cMark.Visible = false
+                cMark.ZIndex = 604
+                cMark.Parent = checkIndicator
+
+                optText.Size = UDim2.new(1, -26, 1, 0)
+                optText.Position = UDim2.new(0, 24, 0, 0)
+
+                items[idx] = {
+                    frame = optRow,
+                    name = optName,
+                    stroke = optStroke,
+                    text = optText,
+                    check = checkIndicator,
+                    checkStroke = cStroke,
+                    mark = cMark
+                }
+            else
+                optText.Size = UDim2.new(1, -12, 1, 0)
+                optText.Position = UDim2.new(0, 8, 0, 0)
+
+                items[idx] = {
+                    frame = optRow,
+                    name = optName,
+                    stroke = optStroke,
+                    text = optText
+                }
+            end
+        end
+
+        local function refreshVisuals()
+            for _, it in ipairs(items) do
+                if isMulti then
+                    local isSel = (currentVal[it.name] == true)
+                    it.mark.Visible = isSel
+                    it.check.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(30, 32, 38)
+                    it.checkStroke.Color = isSel and Color3.fromRGB(255, 95, 110) or Color3.fromRGB(50, 54, 66)
+                    it.text.TextColor3 = isSel and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 155, 170)
+                    it.frame.BackgroundColor3 = isSel and Color3.fromRGB(28, 28, 34) or Color3.fromRGB(24, 24, 28)
+                else
+                    local isSel = (currentVal == it.name)
+                    it.text.TextColor3 = isSel and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 155, 170)
+                    it.text.Font = isSel and ThemeFontBold or ThemeFont
+                    it.stroke.Color = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(38, 40, 48)
+                    it.frame.BackgroundColor3 = isSel and Color3.fromRGB(30, 30, 38) or Color3.fromRGB(24, 24, 28)
+                end
+            end
+        end
+
+        refreshVisuals()
+        Window.Visible = true
+    end
+
+    local function handleClick(clickX, clickY)
+        if not Window.Visible then return false end
+
+        if isInside(clickX, clickY, Window) then
+            for _, it in ipairs(items) do
+                if isInside(clickX, clickY, it.frame) then
+                    if isMulti then
+                        currentVal[it.name] = not currentVal[it.name]
+                        if not currentVal[it.name] then
+                            currentVal[it.name] = nil
+                        end
+                        local isSel = (currentVal[it.name] == true)
+                        it.mark.Visible = isSel
+                        it.check.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(30, 32, 38)
+                        it.checkStroke.Color = isSel and Color3.fromRGB(255, 95, 110) or Color3.fromRGB(50, 54, 66)
+                        it.text.TextColor3 = isSel and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 155, 170)
+                        it.frame.BackgroundColor3 = isSel and Color3.fromRGB(28, 28, 34) or Color3.fromRGB(24, 24, 28)
+
+                        if updateDisplayCb then pcall(updateDisplayCb, currentVal) end
+                        if currentCallback then pcall(currentCallback, currentVal) end
+                    else
+                        currentVal = it.name
+                        if updateDisplayCb then pcall(updateDisplayCb, currentVal) end
+                        if currentCallback then pcall(currentCallback, currentVal) end
+                        close()
+                    end
+                    return true
+                end
+            end
+            return true
+        else
+            close()
+            return true
+        end
+    end
+
+    local function handleHover(mx, my)
+        if not Window.Visible then return false end
+        if not isInside(mx, my, Window) then return false end
+        for _, it in ipairs(items) do
+            local hov = isInside(mx, my, it.frame)
+            if not isMulti then
+                local isSel = (currentVal == it.name)
+                if not isSel then
+                    it.stroke.Color = hov and Color3.fromRGB(60, 65, 80) or Color3.fromRGB(38, 40, 48)
+                    it.frame.BackgroundColor3 = hov and Color3.fromRGB(32, 34, 42) or Color3.fromRGB(24, 24, 28)
+                    it.text.TextColor3 = hov and Color3.fromRGB(230, 235, 245) or Color3.fromRGB(150, 155, 170)
+                end
+            else
+                local isSel = (currentVal[it.name] == true)
+                if not isSel then
+                    it.frame.BackgroundColor3 = hov and Color3.fromRGB(32, 34, 42) or Color3.fromRGB(24, 24, 28)
+                    it.text.TextColor3 = hov and Color3.fromRGB(230, 235, 245) or Color3.fromRGB(150, 155, 170)
+                end
+            end
+        end
+        return true
+    end
+
+    local function handleWheel(deltaZ)
+        if not Window.Visible then return false end
+        local maxScroll = math.max(0, Scroll.CanvasSize.Y.Offset - Scroll.AbsoluteWindowSize.Y)
+        local newY = math.clamp(Scroll.CanvasPosition.Y - deltaZ * 24, 0, maxScroll)
+        Scroll.CanvasPosition = Vector2.new(0, newY)
+        return true
+    end
+
+    return {
+        Window = Window,
+        Open = open,
+        Close = close,
+        HandleClick = handleClick,
+        HandleHover = handleHover,
+        HandleWheel = handleWheel,
+        IsVisible = function() return Window.Visible end
     }
 end)()
 
@@ -2407,6 +2723,13 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             end
         end
 
+        -- Priority hit-test: Dropdown & Multiselect Overlay
+        if DropdownOverlay.IsVisible() then
+            if DropdownOverlay.HandleClick(clickX, clickY) then
+                return
+            end
+        end
+
         -- Priority hit-test: Context Menu Modal Overlay
         -- While open, user can ONLY interact with Context Menu until closed!
         if ContextMenu.Visible then
@@ -2527,6 +2850,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             return
         end
 
+        if DropdownOverlay.IsVisible() then
+            DropdownOverlay.Close()
+            return
+        end
+
         if ContextMenu.Visible then
             ContextMenu.Visible = false
             isListeningKeybind = false
@@ -2630,11 +2958,26 @@ UserInputService.InputChanged:Connect(function(input)
         local mx = mousePos.X
         local my = mousePos.Y
 
+        if activeGraphDrag then
+            activeGraphDrag.update(mx, my)
+            return
+        end
+
         local anyInteractiveHovered = false
 
         -- Neverlose-style dynamic smooth hover reactions (Zero-GPE)
         if MainFrame.Visible and menuOpen then
-            if ColorPicker.Window.Visible then
+            if DropdownOverlay.IsVisible() then
+                for _, item in ipairs(clickableRegistry) do
+                    if item._isHovered then
+                        item._isHovered = false
+                        if item.onHover then pcall(item.onHover, false) end
+                    end
+                end
+                if DropdownOverlay.HandleHover(mx, my) then
+                    anyInteractiveHovered = true
+                end
+            elseif ColorPicker.Window.Visible then
                 -- Modal isolation: reset any existing hover states outside color picker
                 for _, item in ipairs(clickableRegistry) do
                     if item._isHovered then
@@ -2768,6 +3111,11 @@ UserInputService.InputChanged:Connect(function(input)
         local mx = mouse.X - inset.X
         local my = mouse.Y - inset.Y
 
+        if DropdownOverlay.IsVisible() and isInside(mx, my, DropdownOverlay.Window) then
+            DropdownOverlay.HandleWheel(scrollDelta)
+            return
+        end
+
         if activeTab and MainFrame.Visible and menuOpen then
             local scrollSpeed = 40
             if activeTab.leftScroll and isInside(mx, my, activeTab.leftScroll) then
@@ -2791,6 +3139,10 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
         isDraggingWM = false
         isDraggingKB = false
         activeSlider = nil
+        if activeGraphDrag then
+            activeGraphDrag.finish()
+            activeGraphDrag = nil
+        end
         ColorPicker.EndDrag()
     elseif not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
         -- Handle Release for Hold mode keybinds
@@ -4186,6 +4538,732 @@ end
                     end,
                     Get = function(self)
                         return curC, curA
+                    end
+                }
+            end
+
+            -- 6. Add Dropdown (Single Select)
+            function Column:AddDropdown(dpName, optionsList, defaultVal, callback)
+                optionsList = optionsList or {}
+                defaultVal = defaultVal or optionsList[1] or "None"
+                callback = callback or function() end
+                local currentVal = defaultVal
+
+                local Row = Instance.new("Frame")
+                Row.Name = "DPRow_" .. dpName
+                Row.Active = false
+                Row.Size = UDim2.new(1, 0, 0, 48)
+                Row.BackgroundTransparency = 1
+                Row.ZIndex = 24
+                Row.Parent = ColContent
+
+                local Label = Instance.new("TextLabel")
+                Label.Name = "Label"
+                Label.Active = false
+                Label.Size = UDim2.new(1, 0, 0, 18)
+                Label.Position = UDim2.new(0, 0, 0, 0)
+                Label.BackgroundTransparency = 1
+                Label.Font = ThemeFont
+                Label.Text = dpName
+                Label.TextSize = 13
+                Label.TextColor3 = Color3.fromRGB(215, 220, 230)
+                Label.TextXAlignment = Enum.TextXAlignment.Left
+                Label.TextYAlignment = Enum.TextYAlignment.Center
+                Label.ZIndex = 25
+                Label.Parent = Row
+
+                local Box = Instance.new("Frame")
+                Box.Name = "Box"
+                Box.Active = false
+                Box.Size = UDim2.new(1, 0, 0, 24)
+                Box.Position = UDim2.new(0, 0, 0, 20)
+                Box.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+                Box.BorderSizePixel = 0
+                Box.ZIndex = 25
+                Box.Parent = Row
+
+                local BoxCorner = Instance.new("UICorner")
+                BoxCorner.CornerRadius = UDim.new(0, 3)
+                BoxCorner.Parent = Box
+
+                local BoxStroke = Instance.new("UIStroke")
+                BoxStroke.Thickness = 1
+                BoxStroke.Color = Color3.fromRGB(44, 46, 56)
+                BoxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                BoxStroke.Parent = Box
+
+                local ValLabel = Instance.new("TextLabel")
+                ValLabel.Name = "ValLabel"
+                ValLabel.Active = false
+                ValLabel.Size = UDim2.new(1, -28, 1, 0)
+                ValLabel.Position = UDim2.new(0, 8, 0, 0)
+                ValLabel.BackgroundTransparency = 1
+                ValLabel.Font = ThemeFont
+                ValLabel.Text = tostring(currentVal)
+                ValLabel.TextSize = 12
+                ValLabel.TextColor3 = Color3.fromRGB(235, 240, 248)
+                ValLabel.TextXAlignment = Enum.TextXAlignment.Left
+                ValLabel.TextYAlignment = Enum.TextYAlignment.Center
+                ValLabel.ZIndex = 26
+                ValLabel.Parent = Box
+
+                local Arrow = Instance.new("TextLabel")
+                Arrow.Name = "Arrow"
+                Arrow.Active = false
+                Arrow.Size = UDim2.new(0, 20, 1, 0)
+                Arrow.Position = UDim2.new(1, -22, 0, 0)
+                Arrow.BackgroundTransparency = 1
+                Arrow.Font = ThemeFontBold
+                Arrow.Text = "v"
+                Arrow.TextSize = 10
+                Arrow.TextColor3 = Color3.fromRGB(140, 145, 160)
+                Arrow.TextXAlignment = Enum.TextXAlignment.Center
+                Arrow.TextYAlignment = Enum.TextYAlignment.Center
+                Arrow.ZIndex = 26
+                Arrow.Parent = Box
+
+                local function updateDisplay(v)
+                    currentVal = v
+                    ValLabel.Text = tostring(v)
+                end
+
+                table.insert(clickableRegistry, {
+                    object = Box,
+                    onClick = function()
+                        DropdownOverlay.Open(Box, optionsList, false, currentVal, function(newVal)
+                            updateDisplay(newVal)
+                            pcall(callback, newVal)
+                        end, updateDisplay)
+                    end,
+                    onHover = function(isHovered)
+                        TweenService:Create(Box, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            BackgroundColor3 = isHovered and Color3.fromRGB(30, 30, 36) or Color3.fromRGB(24, 24, 28)
+                        }):Play()
+                        TweenService:Create(BoxStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
+                        }):Play()
+                        TweenService:Create(Arrow, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            TextColor3 = isHovered and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(140, 145, 160)
+                        }):Play()
+                    end
+                })
+
+                return {
+                    Set = function(self, val)
+                        updateDisplay(val)
+                        pcall(callback, val)
+                    end,
+                    Get = function(self)
+                        return currentVal
+                    end,
+                    Refresh = function(self, newList)
+                        optionsList = newList
+                    end
+                }
+            end
+
+            -- 7. Add Multiselect (Multi-Select Dropdown with Checkboxes)
+            function Column:AddMultiselect(msName, optionsList, defaultSelected, callback)
+                optionsList = optionsList or {}
+                defaultSelected = defaultSelected or {}
+                callback = callback or function() end
+
+                local selectedDict = {}
+                if #defaultSelected > 0 then
+                    for _, item in ipairs(defaultSelected) do
+                        selectedDict[item] = true
+                    end
+                else
+                    for k, v in pairs(defaultSelected) do
+                        if v then selectedDict[k] = true end
+                    end
+                end
+
+                local Row = Instance.new("Frame")
+                Row.Name = "MSRow_" .. msName
+                Row.Active = false
+                Row.Size = UDim2.new(1, 0, 0, 48)
+                Row.BackgroundTransparency = 1
+                Row.ZIndex = 24
+                Row.Parent = ColContent
+
+                local Label = Instance.new("TextLabel")
+                Label.Name = "Label"
+                Label.Active = false
+                Label.Size = UDim2.new(1, 0, 0, 18)
+                Label.Position = UDim2.new(0, 0, 0, 0)
+                Label.BackgroundTransparency = 1
+                Label.Font = ThemeFont
+                Label.Text = msName
+                Label.TextSize = 13
+                Label.TextColor3 = Color3.fromRGB(215, 220, 230)
+                Label.TextXAlignment = Enum.TextXAlignment.Left
+                Label.TextYAlignment = Enum.TextYAlignment.Center
+                Label.ZIndex = 25
+                Label.Parent = Row
+
+                local Box = Instance.new("Frame")
+                Box.Name = "Box"
+                Box.Active = false
+                Box.Size = UDim2.new(1, 0, 0, 24)
+                Box.Position = UDim2.new(0, 0, 0, 20)
+                Box.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+                Box.BorderSizePixel = 0
+                Box.ZIndex = 25
+                Box.Parent = Row
+
+                local BoxCorner = Instance.new("UICorner")
+                BoxCorner.CornerRadius = UDim.new(0, 3)
+                BoxCorner.Parent = Box
+
+                local BoxStroke = Instance.new("UIStroke")
+                BoxStroke.Thickness = 1
+                BoxStroke.Color = Color3.fromRGB(44, 46, 56)
+                BoxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                BoxStroke.Parent = Box
+
+                local ValLabel = Instance.new("TextLabel")
+                ValLabel.Name = "ValLabel"
+                ValLabel.Active = false
+                ValLabel.Size = UDim2.new(1, -28, 1, 0)
+                ValLabel.Position = UDim2.new(0, 8, 0, 0)
+                ValLabel.BackgroundTransparency = 1
+                ValLabel.Font = ThemeFont
+                ValLabel.TextSize = 12
+                ValLabel.TextColor3 = Color3.fromRGB(235, 240, 248)
+                ValLabel.TextXAlignment = Enum.TextXAlignment.Left
+                ValLabel.TextYAlignment = Enum.TextYAlignment.Center
+                ValLabel.ZIndex = 26
+                ValLabel.Parent = Box
+
+                local Arrow = Instance.new("TextLabel")
+                Arrow.Name = "Arrow"
+                Arrow.Active = false
+                Arrow.Size = UDim2.new(0, 20, 1, 0)
+                Arrow.Position = UDim2.new(1, -22, 0, 0)
+                Arrow.BackgroundTransparency = 1
+                Arrow.Font = ThemeFontBold
+                Arrow.Text = "v"
+                Arrow.TextSize = 10
+                Arrow.TextColor3 = Color3.fromRGB(140, 145, 160)
+                Arrow.TextXAlignment = Enum.TextXAlignment.Center
+                Arrow.TextYAlignment = Enum.TextYAlignment.Center
+                Arrow.ZIndex = 26
+                Arrow.Parent = Box
+
+                local function getSummaryText()
+                    local activeList = {}
+                    for _, opt in ipairs(optionsList) do
+                        if selectedDict[opt] then
+                            table.insert(activeList, opt)
+                        end
+                    end
+                    if #activeList == 0 then
+                        return "None"
+                    elseif #activeList == #optionsList then
+                        return "All (" .. tostring(#optionsList) .. ")"
+                    elseif #activeList <= 2 then
+                        return table.concat(activeList, ", ")
+                    else
+                        return tostring(#activeList) .. " Selected"
+                    end
+                end
+
+                ValLabel.Text = getSummaryText()
+
+                local function updateDisplay(dict)
+                    selectedDict = dict
+                    ValLabel.Text = getSummaryText()
+                end
+
+                table.insert(clickableRegistry, {
+                    object = Box,
+                    onClick = function()
+                        DropdownOverlay.Open(Box, optionsList, true, selectedDict, function(newDict)
+                            updateDisplay(newDict)
+                            pcall(callback, newDict)
+                        end, updateDisplay)
+                    end,
+                    onHover = function(isHovered)
+                        TweenService:Create(Box, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            BackgroundColor3 = isHovered and Color3.fromRGB(30, 30, 36) or Color3.fromRGB(24, 24, 28)
+                        }):Play()
+                        TweenService:Create(BoxStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
+                        }):Play()
+                        TweenService:Create(Arrow, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            TextColor3 = isHovered and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(140, 145, 160)
+                        }):Play()
+                    end
+                })
+
+                return {
+                    Set = function(self, key, state)
+                        selectedDict[key] = (state == true)
+                        updateDisplay(selectedDict)
+                        pcall(callback, selectedDict)
+                    end,
+                    Get = function(self)
+                        return selectedDict
+                    end
+                }
+            end
+
+            -- 8. Add Hitbox Body Selector (Neverlose Mannequin Silhouette)
+            function Column:AddHitboxSelector(hsTitle, defaultHitboxes, callback)
+                hsTitle = hsTitle or "Target Hitboxes"
+                callback = callback or function() end
+
+                local activeParts = {
+                    Head = false,
+                    Chest = false,
+                    Stomach = false,
+                    Arms = false,
+                    Legs = false
+                }
+
+                if type(defaultHitboxes) == "table" then
+                    for k, v in pairs(defaultHitboxes) do
+                        if type(k) == "number" then
+                            if activeParts[v] ~= nil then activeParts[v] = true end
+                        elseif activeParts[k] ~= nil then
+                            activeParts[k] = (v == true)
+                        end
+                    end
+                end
+
+                local Row = Instance.new("Frame")
+                Row.Name = "HSRow_" .. hsTitle
+                Row.Active = false
+                Row.Size = UDim2.new(1, 0, 0, 146)
+                Row.BackgroundTransparency = 1
+                Row.ZIndex = 24
+                Row.Parent = ColContent
+
+                local Label = Instance.new("TextLabel")
+                Label.Name = "Label"
+                Label.Active = false
+                Label.Size = UDim2.new(1, 0, 0, 18)
+                Label.Position = UDim2.new(0, 0, 0, 0)
+                Label.BackgroundTransparency = 1
+                Label.Font = ThemeFont
+                Label.Text = hsTitle
+                Label.TextSize = 13
+                Label.TextColor3 = Color3.fromRGB(215, 220, 230)
+                Label.TextXAlignment = Enum.TextXAlignment.Left
+                Label.TextYAlignment = Enum.TextYAlignment.Center
+                Label.ZIndex = 25
+                Label.Parent = Row
+
+                local Container = Instance.new("Frame")
+                Container.Name = "Container"
+                Container.Active = false
+                Container.Size = UDim2.new(1, 0, 0, 122)
+                Container.Position = UDim2.new(0, 0, 0, 22)
+                Container.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+                Container.BorderSizePixel = 0
+                Container.ZIndex = 25
+                Container.Parent = Row
+
+                local cCorner = Instance.new("UICorner")
+                cCorner.CornerRadius = UDim.new(0, 4)
+                cCorner.Parent = Container
+
+                local cStroke = Instance.new("UIStroke")
+                cStroke.Thickness = 1
+                cStroke.Color = Color3.fromRGB(40, 42, 52)
+                cStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                cStroke.Parent = Container
+
+                local MannequinArea = Instance.new("Frame")
+                MannequinArea.Name = "MannequinArea"
+                MannequinArea.Active = false
+                MannequinArea.Size = UDim2.new(0, 110, 0, 96)
+                MannequinArea.Position = UDim2.new(0.5, -55, 0, 6)
+                MannequinArea.BackgroundTransparency = 1
+                MannequinArea.ZIndex = 26
+                MannequinArea.Parent = Container
+
+                local Readout = Instance.new("TextLabel")
+                Readout.Name = "Readout"
+                Readout.Active = false
+                Readout.Size = UDim2.new(1, -12, 0, 14)
+                Readout.Position = UDim2.new(0, 6, 1, -16)
+                Readout.BackgroundTransparency = 1
+                Readout.Font = ThemeFont
+                Readout.TextSize = 10
+                Readout.TextColor3 = Color3.fromRGB(150, 155, 170)
+                Readout.TextXAlignment = Enum.TextXAlignment.Center
+                Readout.TextYAlignment = Enum.TextYAlignment.Center
+                Readout.ZIndex = 26
+                Readout.Parent = Container
+
+                local partVisuals = {}
+
+                local function updateReadout()
+                    local list = {}
+                    if activeParts.Head then table.insert(list, "Head") end
+                    if activeParts.Chest then table.insert(list, "Chest") end
+                    if activeParts.Stomach then table.insert(list, "Stomach") end
+                    if activeParts.Arms then table.insert(list, "Arms") end
+                    if activeParts.Legs then table.insert(list, "Legs") end
+                    if #list == 0 then
+                        Readout.Text = "Selected: None"
+                    elseif #list == 5 then
+                        Readout.Text = "Selected: All Hitboxes"
+                    else
+                        Readout.Text = "Selected: " .. table.concat(list, ", ")
+                    end
+                end
+
+                local function createBodyPart(pName, sizeW, sizeH, posX, posY, cornerRadius, linkedPartKey)
+                    local frame = Instance.new("Frame")
+                    frame.Name = "Part_" .. pName
+                    frame.Active = false
+                    frame.Size = UDim2.new(0, sizeW, 0, sizeH)
+                    frame.Position = UDim2.new(0, posX, 0, posY)
+                    frame.BackgroundColor3 = Color3.fromRGB(28, 30, 38)
+                    frame.BorderSizePixel = 0
+                    frame.ZIndex = 27
+                    frame.Parent = MannequinArea
+
+                    local corner = Instance.new("UICorner")
+                    corner.CornerRadius = UDim.new(0, cornerRadius)
+                    corner.Parent = frame
+
+                    local stroke = Instance.new("UIStroke")
+                    stroke.Thickness = 1
+                    stroke.Color = Color3.fromRGB(48, 52, 66)
+                    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                    stroke.Parent = frame
+
+                    local visualData = {
+                        frame = frame,
+                        stroke = stroke,
+                        key = linkedPartKey
+                    }
+                    table.insert(partVisuals, visualData)
+
+                    local function refresh()
+                        local isSel = (activeParts[linkedPartKey] == true)
+                        frame.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(28, 30, 38)
+                        stroke.Color = isSel and Color3.fromRGB(255, 95, 110) or Color3.fromRGB(48, 52, 66)
+                    end
+
+                    table.insert(clickableRegistry, {
+                        object = frame,
+                        onClick = function()
+                            activeParts[linkedPartKey] = not activeParts[linkedPartKey]
+                            for _, p in ipairs(partVisuals) do
+                                if p.key == linkedPartKey then
+                                    local isSel = activeParts[linkedPartKey]
+                                    p.frame.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(28, 30, 38)
+                                    p.stroke.Color = isSel and Color3.fromRGB(255, 95, 110) or Color3.fromRGB(48, 52, 66)
+                                end
+                            end
+                            updateReadout()
+                            pcall(callback, activeParts)
+                        end,
+                        onHover = function(isHov)
+                            local isSel = (activeParts[linkedPartKey] == true)
+                            if not isSel then
+                                frame.BackgroundColor3 = isHov and Color3.fromRGB(38, 42, 54) or Color3.fromRGB(28, 30, 38)
+                                stroke.Color = isHov and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(48, 52, 66)
+                            end
+                        end
+                    })
+
+                    refresh()
+                    return frame
+                end
+
+                createBodyPart("Head", 20, 20, 45, 2, 10, "Head")
+                createBodyPart("Chest", 34, 22, 38, 25, 3, "Chest")
+                createBodyPart("Stomach", 28, 16, 41, 50, 3, "Stomach")
+                createBodyPart("LeftArm", 11, 38, 23, 25, 3, "Arms")
+                createBodyPart("RightArm", 11, 38, 76, 25, 3, "Arms")
+                createBodyPart("LeftLeg", 13, 34, 40, 69, 3, "Legs")
+                createBodyPart("RightLeg", 13, 34, 57, 69, 3, "Legs")
+
+                updateReadout()
+
+                return {
+                    Set = function(self, partKey, state)
+                        if activeParts[partKey] ~= nil then
+                            activeParts[partKey] = (state == true)
+                            for _, p in ipairs(partVisuals) do
+                                if p.key == partKey then
+                                    local isSel = activeParts[partKey]
+                                    p.frame.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(28, 30, 38)
+                                    p.stroke.Color = isSel and Color3.fromRGB(255, 95, 110) or Color3.fromRGB(48, 52, 66)
+                                end
+                            end
+                            updateReadout()
+                            pcall(callback, activeParts)
+                        end
+                    end,
+                    Get = function(self)
+                        return activeParts
+                    end
+                }
+            end
+
+            -- 9. Add Graph (Interactive Curve / Graph Editor)
+            function Column:AddGraph(graphName, graphConfig, callback)
+                graphName = graphName or "Curve Graph"
+                graphConfig = graphConfig or {}
+                callback = callback or function() end
+
+                local minY = graphConfig.MinY or 0
+                local maxY = graphConfig.MaxY or 100
+                local defaultPoints = graphConfig.Points or { {0, 20}, {0.33, 45}, {0.66, 75}, {1.0, 95} }
+
+                local points = {}
+                for i, p in ipairs(defaultPoints) do
+                    points[i] = {
+                        math.clamp(p[1], 0, 1),
+                        math.clamp(p[2], minY, maxY)
+                    }
+                end
+
+                local Row = Instance.new("Frame")
+                Row.Name = "GraphRow_" .. graphName
+                Row.Active = false
+                Row.Size = UDim2.new(1, 0, 0, 136)
+                Row.BackgroundTransparency = 1
+                Row.ZIndex = 24
+                Row.Parent = ColContent
+
+                local Label = Instance.new("TextLabel")
+                Label.Name = "Label"
+                Label.Active = false
+                Label.Size = UDim2.new(0.55, 0, 0, 18)
+                Label.Position = UDim2.new(0, 0, 0, 0)
+                Label.BackgroundTransparency = 1
+                Label.Font = ThemeFont
+                Label.Text = graphName
+                Label.TextSize = 13
+                Label.TextColor3 = Color3.fromRGB(215, 220, 230)
+                Label.TextXAlignment = Enum.TextXAlignment.Left
+                Label.TextYAlignment = Enum.TextYAlignment.Center
+                Label.ZIndex = 25
+                Label.Parent = Row
+
+                local CoordLabel = Instance.new("TextLabel")
+                CoordLabel.Name = "CoordLabel"
+                CoordLabel.Active = false
+                CoordLabel.Size = UDim2.new(0.45, 0, 0, 18)
+                CoordLabel.Position = UDim2.new(0.55, 0, 0, 0)
+                CoordLabel.BackgroundTransparency = 1
+                CoordLabel.Font = ThemeFont
+                CoordLabel.Text = "Drag points to edit"
+                CoordLabel.TextSize = 10
+                CoordLabel.TextColor3 = Color3.fromRGB(150, 155, 170)
+                CoordLabel.TextXAlignment = Enum.TextXAlignment.Right
+                CoordLabel.TextYAlignment = Enum.TextYAlignment.Center
+                CoordLabel.ZIndex = 25
+                CoordLabel.Parent = Row
+
+                local Canvas = Instance.new("Frame")
+                Canvas.Name = "Canvas"
+                Canvas.Active = false
+                Canvas.Size = UDim2.new(1, 0, 0, 112)
+                Canvas.Position = UDim2.new(0, 0, 0, 22)
+                Canvas.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+                Canvas.BorderSizePixel = 0
+                Canvas.ClipsDescendants = true
+                Canvas.ZIndex = 25
+                Canvas.Parent = Row
+
+                local cCorner = Instance.new("UICorner")
+                cCorner.CornerRadius = UDim.new(0, 4)
+                cCorner.Parent = Canvas
+
+                local cStroke = Instance.new("UIStroke")
+                cStroke.Thickness = 1
+                cStroke.Color = Color3.fromRGB(40, 42, 52)
+                cStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                cStroke.Parent = Canvas
+
+                -- Subtle grid lines
+                for frac = 0.25, 0.75, 0.25 do
+                    local hLine = Instance.new("Frame")
+                    hLine.Name = "GridH_" .. tostring(frac)
+                    hLine.Active = false
+                    hLine.Size = UDim2.new(1, 0, 0, 1)
+                    hLine.Position = UDim2.new(0, 0, frac, 0)
+                    hLine.BackgroundColor3 = Color3.fromRGB(28, 30, 36)
+                    hLine.BorderSizePixel = 0
+                    hLine.ZIndex = 26
+                    hLine.Parent = Canvas
+
+                    local vLine = Instance.new("Frame")
+                    vLine.Name = "GridV_" .. tostring(frac)
+                    vLine.Active = false
+                    vLine.Size = UDim2.new(0, 1, 1, 0)
+                    vLine.Position = UDim2.new(frac, 0, 0, 0)
+                    vLine.BackgroundColor3 = Color3.fromRGB(28, 30, 36)
+                    vLine.BorderSizePixel = 0
+                    vLine.ZIndex = 26
+                    vLine.Parent = Canvas
+                end
+
+                local lineSegments = {}
+                local nodeFrames = {}
+
+                for i = 1, #points - 1 do
+                    local line = Instance.new("Frame")
+                    line.Name = "Line_" .. tostring(i)
+                    line.Active = false
+                    line.BackgroundColor3 = Color3.fromRGB(230, 57, 70)
+                    line.BorderSizePixel = 0
+                    line.AnchorPoint = Vector2.new(0.5, 0.5)
+                    line.ZIndex = 27
+                    line.Parent = Canvas
+                    lineSegments[i] = line
+                end
+
+                for i = 1, #points do
+                    local node = Instance.new("Frame")
+                    node.Name = "Node_" .. tostring(i)
+                    node.Active = false
+                    node.Size = UDim2.new(0, 10, 0, 10)
+                    node.AnchorPoint = Vector2.new(0.5, 0.5)
+                    node.BackgroundColor3 = Color3.fromRGB(240, 240, 250)
+                    node.BorderSizePixel = 0
+                    node.ZIndex = 28
+                    node.Parent = Canvas
+
+                    local nCorner = Instance.new("UICorner")
+                    nCorner.CornerRadius = UDim.new(0, 5)
+                    nCorner.Parent = node
+
+                    local nStroke = Instance.new("UIStroke")
+                    nStroke.Thickness = 2
+                    nStroke.Color = Color3.fromRGB(230, 57, 70)
+                    nStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                    nStroke.Parent = node
+
+                    nodeFrames[i] = node
+                end
+
+                local padX = 12
+                local padY = 12
+
+                local function renderGraph()
+                    local cSize = Canvas.AbsoluteSize
+                    local w = math.max(10, cSize.X - padX * 2)
+                    local h = math.max(10, cSize.Y - padY * 2)
+
+                    local pixelPositions = {}
+                    for i, pt in ipairs(points) do
+                        local px = padX + pt[1] * w
+                        local normY = (pt[2] - minY) / math.max(1, maxY - minY)
+                        local py = cSize.Y - (padY + normY * h)
+                        pixelPositions[i] = Vector2.new(px, py)
+
+                        nodeFrames[i].Position = UDim2.fromOffset(px, py)
+                    end
+
+                    for i = 1, #points - 1 do
+                        local p1 = pixelPositions[i]
+                        local p2 = pixelPositions[i + 1]
+                        local dx = p2.X - p1.X
+                        local dy = p2.Y - p1.Y
+                        local dist = math.sqrt(dx * dx + dy * dy)
+                        local angle = math.deg(math.atan2(dy, dx))
+                        local midX = (p1.X + p2.X) / 2
+                        local midY = (p1.Y + p2.Y) / 2
+
+                        local line = lineSegments[i]
+                        line.Size = UDim2.fromOffset(dist, 2)
+                        line.Position = UDim2.fromOffset(midX, midY)
+                        line.Rotation = angle
+                    end
+                end
+
+                task.defer(renderGraph)
+                Canvas:GetPropertyChangedSignal("AbsoluteSize"):Connect(renderGraph)
+
+                local activePointIdx = nil
+
+                local function handleGraphDrag(mx, my)
+                    if not activePointIdx then return end
+                    local cPos = Canvas.AbsolutePosition
+                    local cSize = Canvas.AbsoluteSize
+                    local w = math.max(10, cSize.X - padX * 2)
+                    local h = math.max(10, cSize.Y - padY * 2)
+
+                    local relX = math.clamp((mx - cPos.X - padX) / w, 0, 1)
+                    local relY = math.clamp((cSize.Y - (my - cPos.Y) - padY) / h, 0, 1)
+                    local valY = minY + relY * (maxY - minY)
+
+                    if activePointIdx == 1 then
+                        relX = 0
+                    elseif activePointIdx == #points then
+                        relX = 1
+                    else
+                        local minX = points[activePointIdx - 1][1] + 0.02
+                        local maxX = points[activePointIdx + 1][1] - 0.02
+                        relX = math.clamp(relX, minX, maxX)
+                    end
+
+                    points[activePointIdx][1] = relX
+                    points[activePointIdx][2] = math.floor(valY * 10 + 0.5) / 10
+
+                    CoordLabel.Text = string.format("P%d: [X: %.2f, Y: %.1f]", activePointIdx, relX, points[activePointIdx][2])
+                    renderGraph()
+                    pcall(callback, points)
+                end
+
+                table.insert(clickableRegistry, {
+                    object = Canvas,
+                    onClick = function(clickX, clickY)
+                        local cPos = Canvas.AbsolutePosition
+                        local cSize = Canvas.AbsoluteSize
+                        local w = math.max(10, cSize.X - padX * 2)
+                        local h = math.max(10, cSize.Y - padY * 2)
+
+                        local nearestIdx = 1
+                        local nearestDist = 9999
+                        for i, pt in ipairs(points) do
+                            local px = cPos.X + padX + pt[1] * w
+                            local normY = (pt[2] - minY) / math.max(1, maxY - minY)
+                            local py = cPos.Y + cSize.Y - (padY + normY * h)
+                            local d = math.sqrt((clickX - px) ^ 2 + (clickY - py) ^ 2)
+                            if d < nearestDist then
+                                nearestDist = d
+                                nearestIdx = i
+                            end
+                        end
+
+                        activePointIdx = nearestIdx
+                        activeGraphDrag = {
+                            update = handleGraphDrag,
+                            finish = function() activePointIdx = nil end
+                        }
+                        handleGraphDrag(clickX, clickY)
+                    end,
+                    onHover = function(isHov)
+                        TweenService:Create(cStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            Color = isHov and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(40, 42, 52)
+                        }):Play()
+                    end
+                })
+
+                return {
+                    Set = function(self, newPoints)
+                        if type(newPoints) == "table" and #newPoints == #points then
+                            for i, p in ipairs(newPoints) do
+                                points[i][1] = math.clamp(p[1], 0, 1)
+                                points[i][2] = math.clamp(p[2], minY, maxY)
+                            end
+                            renderGraph()
+                            pcall(callback, points)
+                        end
+                    end,
+                    Get = function(self)
+                        return points
                     end
                 }
             end
