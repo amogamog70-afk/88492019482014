@@ -38,6 +38,9 @@ function DeadHub:CreateWindow(config)
     local windowTitle = config.Title or config.Name or '<font color="#e63946">Dead</font>Hub'
     local windowSubtitle = config.Subtitle or config.SubTitle or "TRIDENT SURVIVAL"
 
+    local ThemeFont = pcall(function() return Enum.Font.BuilderSansMedium end) and Enum.Font.BuilderSansMedium or Enum.Font.GothamMedium
+    local ThemeFontBold = pcall(function() return Enum.Font.BuilderSansBold end) and Enum.Font.BuilderSansBold or Enum.Font.GothamBold
+
     -- Clean up any existing DeadHub instances
     if parentContainer then
         for _, child in ipairs(parentContainer:GetChildren()) do
@@ -98,10 +101,10 @@ WBrand.LayoutOrder = 1
 WBrand.Size = UDim2.new(0, 0, 0, 20)
 WBrand.AutomaticSize = Enum.AutomaticSize.X
 WBrand.BackgroundTransparency = 1
-WBrand.Font = Enum.Font.GothamBold
+WBrand.Font = ThemeFontBold
 WBrand.Text = windowTitle
 WBrand.RichText = true
-WBrand.TextSize = 12
+WBrand.TextSize = 13
 WBrand.TextColor3 = Color3.fromRGB(240, 240, 245)
 WBrand.TextXAlignment = Enum.TextXAlignment.Left
 WBrand.TextYAlignment = Enum.TextYAlignment.Center
@@ -166,9 +169,9 @@ WName.LayoutOrder = 4
 WName.Size = UDim2.new(0, 0, 0, 20)
 WName.AutomaticSize = Enum.AutomaticSize.X
 WName.BackgroundTransparency = 1
-WName.Font = Enum.Font.GothamBold
+WName.Font = ThemeFontBold
 WName.Text = LocalPlayer and LocalPlayer.DisplayName or "Player"
-WName.TextSize = 11
+WName.TextSize = 12
 WName.TextColor3 = Color3.fromRGB(225, 230, 240)
 WName.TextXAlignment = Enum.TextXAlignment.Left
 WName.TextYAlignment = Enum.TextYAlignment.Center
@@ -196,9 +199,9 @@ WFPSText.LayoutOrder = 7
 WFPSText.Size = UDim2.new(0, 0, 0, 20)
 WFPSText.AutomaticSize = Enum.AutomaticSize.X
 WFPSText.BackgroundTransparency = 1
-WFPSText.Font = Enum.Font.GothamMedium
+WFPSText.Font = ThemeFont
 WFPSText.Text = "60 fps"
-WFPSText.TextSize = 11
+WFPSText.TextSize = 12
 WFPSText.TextColor3 = Color3.fromRGB(195, 200, 215)
 WFPSText.TextXAlignment = Enum.TextXAlignment.Left
 WFPSText.TextYAlignment = Enum.TextYAlignment.Center
@@ -226,9 +229,9 @@ WPingText.LayoutOrder = 10
 WPingText.Size = UDim2.new(0, 0, 0, 20)
 WPingText.AutomaticSize = Enum.AutomaticSize.X
 WPingText.BackgroundTransparency = 1
-WPingText.Font = Enum.Font.GothamMedium
+WPingText.Font = ThemeFont
 WPingText.Text = "0 ms"
-WPingText.TextSize = 11
+WPingText.TextSize = 12
 WPingText.TextColor3 = Color3.fromRGB(195, 200, 215)
 WPingText.TextXAlignment = Enum.TextXAlignment.Left
 WPingText.TextYAlignment = Enum.TextYAlignment.Center
@@ -245,9 +248,9 @@ WTimeText.LayoutOrder = 12
 WTimeText.Size = UDim2.new(0, 0, 0, 20)
 WTimeText.AutomaticSize = Enum.AutomaticSize.X
 WTimeText.BackgroundTransparency = 1
-WTimeText.Font = Enum.Font.GothamMedium
+WTimeText.Font = ThemeFont
 WTimeText.Text = os.date("%H:%M:%S")
-WTimeText.TextSize = 11
+WTimeText.TextSize = 12
 WTimeText.TextColor3 = Color3.fromRGB(140, 145, 160)
 WTimeText.TextXAlignment = Enum.TextXAlignment.Left
 WTimeText.TextYAlignment = Enum.TextYAlignment.Center
@@ -303,9 +306,9 @@ KBTitle.Active = false
 KBTitle.Size = UDim2.new(1, -30, 1, 0)
 KBTitle.Position = UDim2.new(0, 28, 0, 0)
 KBTitle.BackgroundTransparency = 1
-KBTitle.Font = Enum.Font.GothamBold
+KBTitle.Font = ThemeFontBold
 KBTitle.Text = "Keybinds"
-KBTitle.TextSize = 11
+KBTitle.TextSize = 12
 KBTitle.TextColor3 = Color3.fromRGB(230, 235, 245)
 KBTitle.TextXAlignment = Enum.TextXAlignment.Left
 KBTitle.TextYAlignment = Enum.TextYAlignment.Center
@@ -375,9 +378,9 @@ local function addKeybindEntry(id, name, mode, isActive, keyName)
     nameLbl.Size = UDim2.new(1, -78, 1, 0)
     nameLbl.Position = UDim2.new(0, 0, 0, 0)
     nameLbl.BackgroundTransparency = 1
-    nameLbl.Font = Enum.Font.GothamMedium
+    nameLbl.Font = ThemeFont
     nameLbl.Text = name
-    nameLbl.TextSize = 10
+    nameLbl.TextSize = 12
     nameLbl.TextColor3 = Color3.fromRGB(200, 205, 218)
     nameLbl.TextXAlignment = Enum.TextXAlignment.Left
     nameLbl.TextYAlignment = Enum.TextYAlignment.Center
@@ -391,7 +394,7 @@ local function addKeybindEntry(id, name, mode, isActive, keyName)
     modeBadge.Size = UDim2.new(0, 75, 1, 0)
     modeBadge.Position = UDim2.new(1, -75, 0, 0)
     modeBadge.BackgroundTransparency = 1
-    modeBadge.Font = Enum.Font.GothamBold
+    modeBadge.Font = ThemeFontBold
 
     local badgeText = ""
     if keyName and keyName ~= "" and keyName ~= "None" then
@@ -401,7 +404,7 @@ local function addKeybindEntry(id, name, mode, isActive, keyName)
     end
 
     modeBadge.Text = badgeText
-    modeBadge.TextSize = 9
+    modeBadge.TextSize = 11
     modeBadge.TextColor3 = isActive and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(120, 125, 140)
     modeBadge.TextXAlignment = Enum.TextXAlignment.Right
     modeBadge.TextYAlignment = Enum.TextYAlignment.Center
@@ -510,8 +513,8 @@ Title.Active = false
 Title.Size = UDim2.new(0, 165, 0, 24)
 Title.Position = UDim2.new(0, 18, 0, 9)
 Title.BackgroundTransparency = 1
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 18 -- Integer pixel grid: eliminates font blur
+Title.Font = ThemeFontBold
+Title.TextSize = 18
 Title.RichText = true
 Title.Text = windowTitle
 Title.TextColor3 = Color3.fromRGB(240, 240, 245)
@@ -520,17 +523,17 @@ Title.TextYAlignment = Enum.TextYAlignment.Center
 Title.TextTruncate = Enum.TextTruncate.AtEnd
 Title.Parent = Header
 
--- Subtle Subtitle below the Title (Smooths out transition and frames the header)
+-- Subtle Subtitle below the Title
 local Subtitle = Instance.new("TextLabel")
 Subtitle.Name = "Subtitle"
 Subtitle.Active = false
 Subtitle.Size = UDim2.new(0, 165, 0, 14)
 Subtitle.Position = UDim2.new(0, 18, 0, 31)
 Subtitle.BackgroundTransparency = 1
-Subtitle.Font = Enum.Font.GothamMedium
-Subtitle.TextSize = 10 -- Crisp readable size
+Subtitle.Font = ThemeFont
+Subtitle.TextSize = 11
 Subtitle.Text = windowSubtitle
-Subtitle.TextColor3 = Color3.fromRGB(110, 115, 130)
+Subtitle.TextColor3 = Color3.fromRGB(130, 135, 150)
 Subtitle.TextXAlignment = Enum.TextXAlignment.Left
 Subtitle.TextYAlignment = Enum.TextYAlignment.Center
 Subtitle.TextTruncate = Enum.TextTruncate.AtEnd
@@ -588,9 +591,9 @@ SessionVal.Active = false
 SessionVal.Size = UDim2.new(1, -26, 1, 0)
 SessionVal.Position = UDim2.new(0, 24, 0, 0)
 SessionVal.BackgroundTransparency = 1
-SessionVal.Font = Enum.Font.GothamBold
+SessionVal.Font = ThemeFontBold
 SessionVal.Text = "00:00:00"
-SessionVal.TextSize = 10
+SessionVal.TextSize = 11
 SessionVal.TextColor3 = Color3.fromRGB(225, 230, 240)
 SessionVal.TextXAlignment = Enum.TextXAlignment.Center
 SessionVal.TextYAlignment = Enum.TextYAlignment.Center
@@ -631,9 +634,9 @@ MemVal.Active = false
 MemVal.Size = UDim2.new(1, -29, 1, 0)
 MemVal.Position = UDim2.new(0, 27, 0, 0)
 MemVal.BackgroundTransparency = 1
-MemVal.Font = Enum.Font.GothamBold
+MemVal.Font = ThemeFontBold
 MemVal.Text = "0 MB"
-MemVal.TextSize = 10
+MemVal.TextSize = 11
 MemVal.TextColor3 = Color3.fromRGB(225, 230, 240)
 MemVal.TextXAlignment = Enum.TextXAlignment.Center
 MemVal.TextYAlignment = Enum.TextYAlignment.Center
@@ -1282,10 +1285,10 @@ ContextTitle.Active = false
 ContextTitle.Size = UDim2.new(1, -16, 0, 20)
 ContextTitle.Position = UDim2.new(0, 8, 0, 2)
 ContextTitle.BackgroundTransparency = 1
-ContextTitle.Font = Enum.Font.GothamBold
+ContextTitle.Font = ThemeFontBold
 ContextTitle.Text = "Options"
-ContextTitle.TextSize = 10
-ContextTitle.TextColor3 = Color3.fromRGB(160, 165, 180)
+ContextTitle.TextSize = 12
+ContextTitle.TextColor3 = Color3.fromRGB(180, 185, 200)
 ContextTitle.TextXAlignment = Enum.TextXAlignment.Left
 ContextTitle.TextYAlignment = Enum.TextYAlignment.Center
 ContextTitle.TextTruncate = Enum.TextTruncate.AtEnd
@@ -1324,9 +1327,9 @@ CtxKeybindText.Name = "CtxKeybindText"
 CtxKeybindText.Active = false
 CtxKeybindText.Size = UDim2.new(1, 0, 1, 0)
 CtxKeybindText.BackgroundTransparency = 1
-CtxKeybindText.Font = Enum.Font.GothamBold
+CtxKeybindText.Font = ThemeFontBold
 CtxKeybindText.Text = "Key: [ None ]"
-CtxKeybindText.TextSize = 9
+CtxKeybindText.TextSize = 11
 CtxKeybindText.TextColor3 = Color3.fromRGB(215, 220, 235)
 CtxKeybindText.TextXAlignment = Enum.TextXAlignment.Center
 CtxKeybindText.TextYAlignment = Enum.TextYAlignment.Center
@@ -1371,9 +1374,9 @@ for i, modeName in ipairs(modeRowConfigs) do
     mLbl.Size = UDim2.new(1, -22, 1, 0)
     mLbl.Position = UDim2.new(0, 18, 0, 0)
     mLbl.BackgroundTransparency = 1
-    mLbl.Font = Enum.Font.GothamMedium
+    mLbl.Font = ThemeFont
     mLbl.Text = modeName
-    mLbl.TextSize = 10
+    mLbl.TextSize = 12
     mLbl.TextColor3 = Color3.fromRGB(160, 165, 180)
     mLbl.TextXAlignment = Enum.TextXAlignment.Left
     mLbl.TextYAlignment = Enum.TextYAlignment.Center
@@ -1402,7 +1405,7 @@ local function updateContextMenuUI()
         local isSelected = (mName == curMode)
         mObj.dot.Visible = isSelected
         mObj.lbl.TextColor3 = isSelected and Color3.fromRGB(245, 245, 250) or Color3.fromRGB(150, 155, 170)
-        mObj.lbl.Font = isSelected and Enum.Font.GothamBold or Enum.Font.GothamMedium
+        mObj.lbl.Font = isSelected and ThemeFontBold or ThemeFont
         mObj.row.BackgroundColor3 = isSelected and Color3.fromRGB(28, 28, 34) or Color3.fromRGB(24, 24, 28)
     end
 end
@@ -1920,9 +1923,9 @@ end
         TabTitle.Size = iconAsset and UDim2.new(1, -38, 1, 0) or UDim2.new(1, -20, 1, 0)
         TabTitle.Position = iconAsset and UDim2.new(0, 34, 0, 0) or UDim2.new(0, 14, 0, 0)
         TabTitle.BackgroundTransparency = 1
-        TabTitle.Font = Enum.Font.GothamMedium
+        TabTitle.Font = ThemeFont
         TabTitle.Text = tabName
-        TabTitle.TextSize = 11
+        TabTitle.TextSize = 13
         TabTitle.TextColor3 = Color3.fromRGB(130, 135, 150)
         TabTitle.TextXAlignment = Enum.TextXAlignment.Left
         TabTitle.TextYAlignment = Enum.TextYAlignment.Center
@@ -2014,7 +2017,7 @@ end
                 t.stroke.Transparency = 1
                 t.accent.Visible = false
                 t.title.TextColor3 = Color3.fromRGB(130, 135, 150)
-                t.title.Font = Enum.Font.GothamMedium
+                t.title.Font = ThemeFont
                 if t.icon then
                     t.icon.ImageColor3 = Color3.fromRGB(130, 135, 150)
                 end
@@ -2034,7 +2037,7 @@ end
             TabStroke.Transparency = 0
             TabAccent.Visible = true
             TabTitle.TextColor3 = Color3.fromRGB(245, 245, 250)
-            TabTitle.Font = Enum.Font.GothamBold
+            TabTitle.Font = ThemeFontBold
             if TabIcon then
                 TabIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
             end
@@ -2128,9 +2131,9 @@ end
             ColHeaderText.Size = UDim2.new(1, -24, 1, 0)
             ColHeaderText.Position = UDim2.new(0, 12, 0, 0)
             ColHeaderText.BackgroundTransparency = 1
-            ColHeaderText.Font = Enum.Font.GothamBold
+            ColHeaderText.Font = ThemeFontBold
             ColHeaderText.Text = colTitle
-            ColHeaderText.TextSize = 11
+            ColHeaderText.TextSize = 13
             ColHeaderText.TextColor3 = Color3.fromRGB(230, 235, 245)
             ColHeaderText.TextXAlignment = Enum.TextXAlignment.Left
             ColHeaderText.TextYAlignment = Enum.TextYAlignment.Center
@@ -2217,12 +2220,12 @@ end
                 local Label = Instance.new("TextLabel")
                 Label.Name = "Label"
                 Label.Active = false
-                Label.Size = UDim2.new(1, -40, 1, 0)
+                Label.Size = UDim2.new(1, -44, 1, 0)
                 Label.Position = UDim2.new(0, 0, 0, 0)
                 Label.BackgroundTransparency = 1
-                Label.Font = Enum.Font.GothamMedium
+                Label.Font = ThemeFont
                 Label.Text = toggleName
-                Label.TextSize = 11
+                Label.TextSize = 13
                 Label.TextColor3 = Color3.fromRGB(215, 220, 230)
                 Label.TextXAlignment = Enum.TextXAlignment.Left
                 Label.TextYAlignment = Enum.TextYAlignment.Center
@@ -2403,9 +2406,9 @@ end
                 BtnLabel.Active = false
                 BtnLabel.Size = UDim2.new(1, 0, 1, 0)
                 BtnLabel.BackgroundTransparency = 1
-                BtnLabel.Font = Enum.Font.GothamBold
+                BtnLabel.Font = ThemeFontBold
                 BtnLabel.Text = btnName
-                BtnLabel.TextSize = 11
+                BtnLabel.TextSize = 12
                 BtnLabel.TextColor3 = Color3.fromRGB(225, 230, 240)
                 BtnLabel.TextXAlignment = Enum.TextXAlignment.Center
                 BtnLabel.TextYAlignment = Enum.TextYAlignment.Center
@@ -2428,19 +2431,32 @@ end
                 }
             end
 
-            -- 3. Add Slider (Custom precision slider with track and thumb)
-            function Column:AddSlider(sliderName, min, max, defaultVal, callback)
+            -- 3. Add Slider (Custom precision slider with track, thumb, suffix, and editable text box)
+            function Column:AddSlider(sliderName, min, max, defaultVal, arg5, arg6)
                 min = min or 0
                 max = max or 100
                 defaultVal = math.clamp(defaultVal or min, min, max)
-                callback = callback or function() end
+
+                local suffix = ""
+                local callback = nil
+                if type(arg5) == "string" then
+                    suffix = arg5
+                    callback = arg6 or function() end
+                elseif type(arg5) == "function" then
+                    callback = arg5
+                    if type(arg6) == "string" then
+                        suffix = arg6
+                    end
+                else
+                    callback = arg6 or function() end
+                end
 
                 local curVal = defaultVal
 
                 local Row = Instance.new("Frame")
                 Row.Name = "SliderRow_" .. sliderName
                 Row.Active = false
-                Row.Size = UDim2.new(1, 0, 0, 38)
+                Row.Size = UDim2.new(1, 0, 0, 42)
                 Row.BackgroundTransparency = 1
                 Row.ZIndex = 24
                 Row.Parent = ColContent
@@ -2448,38 +2464,60 @@ end
                 local Label = Instance.new("TextLabel")
                 Label.Name = "Label"
                 Label.Active = false
-                Label.Size = UDim2.new(1, -60, 0, 16)
-                Label.Position = UDim2.new(0, 0, 0, 2)
+                Label.Size = UDim2.new(1, -72, 0, 18)
+                Label.Position = UDim2.new(0, 0, 0, 0)
                 Label.BackgroundTransparency = 1
-                Label.Font = Enum.Font.GothamMedium
+                Label.Font = ThemeFont
                 Label.Text = sliderName
-                Label.TextSize = 11
+                Label.TextSize = 13
                 Label.TextColor3 = Color3.fromRGB(215, 220, 230)
                 Label.TextXAlignment = Enum.TextXAlignment.Left
                 Label.TextYAlignment = Enum.TextYAlignment.Center
                 Label.ZIndex = 25
                 Label.Parent = Row
 
-                local ValLabel = Instance.new("TextLabel")
-                ValLabel.Name = "ValLabel"
-                ValLabel.Active = false
-                ValLabel.Size = UDim2.new(0, 60, 0, 16)
-                ValLabel.Position = UDim2.new(1, -60, 0, 2)
-                ValLabel.BackgroundTransparency = 1
-                ValLabel.Font = Enum.Font.GothamBold
-                ValLabel.Text = tostring(curVal)
-                ValLabel.TextSize = 10
-                ValLabel.TextColor3 = Color3.fromRGB(230, 57, 70)
-                ValLabel.TextXAlignment = Enum.TextXAlignment.Right
-                ValLabel.TextYAlignment = Enum.TextYAlignment.Center
-                ValLabel.ZIndex = 25
-                ValLabel.Parent = Row
+                -- Editable Value Box Frame (Click to type exact numbers)
+                local ValBoxFrame = Instance.new("Frame")
+                ValBoxFrame.Name = "ValBoxFrame"
+                ValBoxFrame.Active = false
+                ValBoxFrame.Size = UDim2.new(0, 64, 0, 20)
+                ValBoxFrame.Position = UDim2.new(1, -64, 0, 0)
+                ValBoxFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+                ValBoxFrame.BorderSizePixel = 0
+                ValBoxFrame.ZIndex = 25
+                ValBoxFrame.Parent = Row
+
+                local ValBoxCorner = Instance.new("UICorner")
+                ValBoxCorner.CornerRadius = UDim.new(0, 3)
+                ValBoxCorner.Parent = ValBoxFrame
+
+                local ValBoxStroke = Instance.new("UIStroke")
+                ValBoxStroke.Thickness = 1
+                ValBoxStroke.Color = Color3.fromRGB(42, 46, 56)
+                ValBoxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                ValBoxStroke.Parent = ValBoxFrame
+
+                local ValBox = Instance.new("TextBox")
+                ValBox.Name = "ValBox"
+                ValBox.Active = false
+                ValBox.Size = UDim2.new(1, -6, 1, 0)
+                ValBox.Position = UDim2.new(0, 3, 0, 0)
+                ValBox.BackgroundTransparency = 1
+                ValBox.Font = ThemeFontBold
+                ValBox.Text = tostring(curVal) .. suffix
+                ValBox.TextSize = 11
+                ValBox.TextColor3 = Color3.fromRGB(230, 57, 70)
+                ValBox.TextXAlignment = Enum.TextXAlignment.Center
+                ValBox.TextYAlignment = Enum.TextYAlignment.Center
+                ValBox.ClearTextOnFocus = false
+                ValBox.ZIndex = 26
+                ValBox.Parent = ValBoxFrame
 
                 local Track = Instance.new("Frame")
                 Track.Name = "Track"
                 Track.Active = false
                 Track.Size = UDim2.new(1, 0, 0, 6)
-                Track.Position = UDim2.new(0, 0, 0, 24)
+                Track.Position = UDim2.new(0, 0, 0, 26)
                 Track.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
                 Track.BorderSizePixel = 0
                 Track.ZIndex = 25
@@ -2491,7 +2529,7 @@ end
                 TrackStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 TrackStroke.Parent = Track
 
-                local initPct = (curVal - min) / (max - min)
+                local initPct = (max > min) and ((curVal - min) / (max - min)) or 0
                 local Fill = Instance.new("Frame")
                 Fill.Name = "Fill"
                 Fill.Active = false
@@ -2517,25 +2555,48 @@ end
                 ThumbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 ThumbStroke.Parent = Thumb
 
-                local function updateSlider(mouseX)
-                    local trackPos = Track.AbsolutePosition
-                    local trackSize = Track.AbsoluteSize
-                    local pct = math.clamp((mouseX - trackPos.X) / trackSize.X, 0, 1)
-                    curVal = math.round(min + (max - min) * pct)
-                    ValLabel.Text = tostring(curVal)
+                local function setSlider(val)
+                    curVal = math.clamp(math.round(val), min, max)
+                    local pct = (max > min) and ((curVal - min) / (max - min)) or 0
+                    ValBox.Text = tostring(curVal) .. suffix
                     Fill.Size = UDim2.new(pct, 0, 1, 0)
                     Thumb.Position = UDim2.new(pct, -5, 0.5, -5)
                     pcall(callback, curVal)
                 end
 
-                local function setSlider(val)
-                    curVal = math.clamp(math.round(val), min, max)
-                    local pct = (curVal - min) / (max - min)
-                    ValLabel.Text = tostring(curVal)
+                local function updateSlider(mouseX)
+                    local trackPos = Track.AbsolutePosition
+                    local trackSize = Track.AbsoluteSize
+                    local pct = math.clamp((mouseX - trackPos.X) / trackSize.X, 0, 1)
+                    curVal = math.round(min + (max - min) * pct)
+                    ValBox.Text = tostring(curVal) .. suffix
                     Fill.Size = UDim2.new(pct, 0, 1, 0)
                     Thumb.Position = UDim2.new(pct, -5, 0.5, -5)
                     pcall(callback, curVal)
                 end
+
+                table.insert(clickableRegistry, {
+                    object = ValBoxFrame,
+                    onClick = function()
+                        ValBox:CaptureFocus()
+                    end
+                })
+
+                ValBox.Focused:Connect(function()
+                    ValBox.Text = tostring(curVal)
+                    TweenService:Create(ValBoxStroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(230, 57, 70)}):Play()
+                end)
+
+                ValBox.FocusLost:Connect(function(enterPressed)
+                    TweenService:Create(ValBoxStroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(42, 46, 56)}):Play()
+                    local clean = ValBox.Text:gsub("[^%d%.%-]", "")
+                    local num = tonumber(clean)
+                    if num then
+                        setSlider(num)
+                    else
+                        ValBox.Text = tostring(curVal) .. suffix
+                    end
+                end)
 
                 table.insert(sliderRegistry, {
                     hitbox = Row,
@@ -2563,12 +2624,12 @@ end
                 local Label = Instance.new("TextLabel")
                 Label.Name = "Label"
                 Label.Active = false
-                Label.Size = UDim2.new(1, 0, 0, 16)
-                Label.Position = UDim2.new(0, 0, 0, 2)
+                Label.Size = UDim2.new(1, 0, 0, 18)
+                Label.Position = UDim2.new(0, 0, 0, 0)
                 Label.BackgroundTransparency = 1
-                Label.Font = Enum.Font.GothamMedium
+                Label.Font = ThemeFont
                 Label.Text = boxName
-                Label.TextSize = 11
+                Label.TextSize = 13
                 Label.TextColor3 = Color3.fromRGB(215, 220, 230)
                 Label.TextXAlignment = Enum.TextXAlignment.Left
                 Label.TextYAlignment = Enum.TextYAlignment.Center
@@ -2597,12 +2658,12 @@ end
                 TBox.Size = UDim2.new(1, -16, 1, 0)
                 TBox.Position = UDim2.new(0, 8, 0, 0)
                 TBox.BackgroundTransparency = 1
-                TBox.Font = Enum.Font.GothamMedium
+                TBox.Font = ThemeFont
                 TBox.Text = ""
                 TBox.PlaceholderText = placeholder or "Enter text..."
                 TBox.PlaceholderColor3 = Color3.fromRGB(100, 105, 120)
                 TBox.TextColor3 = Color3.fromRGB(235, 240, 248)
-                TBox.TextSize = 10
+                TBox.TextSize = 12
                 TBox.TextXAlignment = Enum.TextXAlignment.Left
                 TBox.ClearTextOnFocus = false
                 TBox.ZIndex = 26
@@ -2708,9 +2769,9 @@ end
             SubBtnText.Size = UDim2.new(0, 0, 1, 0)
             SubBtnText.AutomaticSize = Enum.AutomaticSize.X
             SubBtnText.BackgroundTransparency = 1
-            SubBtnText.Font = Enum.Font.GothamMedium
+            SubBtnText.Font = ThemeFont
             SubBtnText.Text = subTabName
-            SubBtnText.TextSize = 11
+            SubBtnText.TextSize = 12
             SubBtnText.TextColor3 = Color3.fromRGB(130, 135, 150)
             SubBtnText.TextXAlignment = Enum.TextXAlignment.Center
             SubBtnText.TextYAlignment = Enum.TextYAlignment.Center
@@ -2795,7 +2856,7 @@ end
                     s.btn.BackgroundTransparency = 1
                     s.stroke.Transparency = 1
                     s.text.TextColor3 = Color3.fromRGB(130, 135, 150)
-                    s.text.Font = Enum.Font.GothamMedium
+                    s.text.Font = ThemeFont
                     if s.icon then
                         s.icon.ImageColor3 = Color3.fromRGB(130, 135, 150)
                     end
@@ -2808,7 +2869,7 @@ end
                 SubBtnStroke.Transparency = 0
                 SubBtnStroke.Color = Color3.fromRGB(48, 52, 66)
                 SubBtnText.TextColor3 = Color3.fromRGB(245, 245, 250)
-                SubBtnText.Font = Enum.Font.GothamBold
+                SubBtnText.Font = ThemeFontBold
                 if SubIcon then
                     SubIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
                 end
