@@ -171,6 +171,7 @@ function DeadHub:CreateWindow(config)
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "DeadHub_" .. tostring(math.random(100000, 999999))
     ScreenGui.ResetOnSpawn = false
+    ScreenGui.IgnoreGuiInset = true
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.DisplayOrder = 999
     ScreenGui.Parent = parentContainer
@@ -1526,31 +1527,6 @@ local activeSlider = nil
 local activeContextItem = nil
 local isListeningKeybind = false
 
--- Color Utilities
-local function rgbToHex(color)
-    local r = math.clamp(math.round(color.R * 255), 0, 255)
-    local g = math.clamp(math.round(color.G * 255), 0, 255)
-    local b = math.clamp(math.round(color.B * 255), 0, 255)
-    return string.format("#%02x%02x%02x", r, g, b)
-end
-
-local function hexToRgb(hex)
-    if not hex or type(hex) ~= "string" then return nil end
-    local clean = hex:gsub("#", ""):gsub("%s+", "")
-    if #clean == 3 then
-        local r = tonumber(clean:sub(1, 1):rep(2), 16)
-        local g = tonumber(clean:sub(2, 2):rep(2), 16)
-        local b = tonumber(clean:sub(3, 3):rep(2), 16)
-        if r and g and b then return Color3.fromRGB(r, g, b) end
-    elseif #clean == 6 then
-        local r = tonumber(clean:sub(1, 2), 16)
-        local g = tonumber(clean:sub(3, 4), 16)
-        local b = tonumber(clean:sub(5, 6), 16)
-        if r and g and b then return Color3.fromRGB(r, g, b) end
-    end
-    return nil
-end
-
 -- Pixel Color Picker Modal Module (Encapsulated closure to stay within 200 locals limit)
 local ColorPicker = (function()
     local activeColorPicker = nil
@@ -1565,7 +1541,7 @@ local ColorPicker = (function()
     Window.Size = UDim2.new(0, 212, 0, 214)
     Window.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     Window.BorderSizePixel = 0
-    Window.ZIndex = 250
+    Window.ZIndex = 500
     Window.Parent = ScreenGui
 
     local cpCorner = Instance.new("UICorner")
@@ -1955,12 +1931,12 @@ local ColorPicker = (function()
         local as = anchorObj.AbsoluteSize
         local vp = getViewportSize()
 
-        local targetX = ap.X - 222
-        if targetX < 10 then
-            targetX = ap.X + as.X + 8
+        local targetX = ap.X + as.X + 8
+        if targetX + 216 > vp.X - 8 then
+            targetX = ap.X - 220
         end
-        targetX = math.clamp(targetX, 10, math.max(10, vp.X - 226))
-        local targetY = math.clamp(ap.Y - 20, 10, math.max(10, vp.Y - 230))
+        targetX = math.clamp(targetX, 8, math.max(8, vp.X - 220))
+        local targetY = math.clamp(ap.Y - 10, 8, math.max(8, vp.Y - 224))
 
         Window.Position = UDim2.fromOffset(targetX, targetY)
         Window.Visible = true
@@ -2180,7 +2156,7 @@ for i, modeName in ipairs(modeRowConfigs) do
     mLbl.ZIndex = 203
     mLbl.Parent = mRow
 
-    modeButtons[modeName:lower()] = {row = mRow, dot = mDot, lbl = mLbl}
+    modeButtons[modeName:lower()] = {row = mRow, stroke = mStroke, dot = mDot, lbl = mLbl}
 end
 
 local function updateContextMenuUI()
@@ -2190,11 +2166,13 @@ local function updateContextMenuUI()
     if isListeningKeybind then
         CtxKeybindText.Text = "Press any key..."
         CtxKeybindText.TextColor3 = Color3.fromRGB(230, 57, 70)
+        TweenService:Create(CtxKeybindStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Color = Color3.fromRGB(230, 57, 70)}):Play()
     else
         local k = activeContextItem.getKey()
         local kName = k and k.Name or "None"
         CtxKeybindText.Text = "Key: [ " .. kName .. " ]"
         CtxKeybindText.TextColor3 = Color3.fromRGB(215, 220, 235)
+        TweenService:Create(CtxKeybindStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Color = Color3.fromRGB(40, 42, 50)}):Play()
     end
 
     local curMode = activeContextItem.getMode()
@@ -2204,6 +2182,7 @@ local function updateContextMenuUI()
         mObj.lbl.TextColor3 = isSelected and Color3.fromRGB(245, 245, 250) or Color3.fromRGB(150, 155, 170)
         mObj.lbl.Font = isSelected and ThemeFontBold or ThemeFont
         mObj.row.BackgroundColor3 = isSelected and Color3.fromRGB(28, 28, 34) or Color3.fromRGB(24, 24, 28)
+        mObj.stroke.Color = isSelected and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(36, 38, 46)
     end
 end
 
@@ -2319,10 +2298,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 end
             end
 
-            -- 7. Check Clickable components in active Tab (Toggles, Buttons, Tabs, Textboxes)
-            for _, item in ipairs(clickableRegistry) do
+            -- 7. Check Clickable components in active Tab (Reverse order: child components like SwatchBtn take precedence over parent Row)
+            for i = #clickableRegistry, 1, -1 do
+                local item = clickableRegistry[i]
                 if item.object and isInside(clickX, clickY, item.object) then
-                    item.onClick()
+                    item.onClick(clickX, clickY)
                     return
                 end
             end
@@ -2449,6 +2429,41 @@ UserInputService.InputChanged:Connect(function(input)
 
             if ColorPicker.Window.Visible and isInside(mx, my, ColorPicker.Window) then
                 anyInteractiveHovered = true
+            end
+
+            if ContextMenu.Visible then
+                local isKeybindHov = isInside(mx, my, CtxKeybindRow)
+                if isKeybindHov then anyInteractiveHovered = true end
+                if not isListeningKeybind then
+                    TweenService:Create(CtxKeybindStroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                        Color = isKeybindHov and Color3.fromRGB(80, 88, 110) or Color3.fromRGB(40, 42, 50)
+                    }):Play()
+                    TweenService:Create(CtxKeybindRow, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                        BackgroundColor3 = isKeybindHov and Color3.fromRGB(32, 32, 40) or Color3.fromRGB(26, 26, 32)
+                    }):Play()
+                end
+
+                local curMode = activeContextItem and activeContextItem.getMode()
+                for mName, mObj in pairs(modeButtons) do
+                    local isHov = isInside(mx, my, mObj.row)
+                    if isHov then anyInteractiveHovered = true end
+                    local isSelected = (mName == curMode)
+                    if not isSelected then
+                        TweenService:Create(mObj.stroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                            Color = isHov and Color3.fromRGB(70, 76, 96) or Color3.fromRGB(36, 38, 46)
+                        }):Play()
+                        TweenService:Create(mObj.row, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                            BackgroundColor3 = isHov and Color3.fromRGB(28, 28, 34) or Color3.fromRGB(24, 24, 28)
+                        }):Play()
+                        TweenService:Create(mObj.lbl, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                            TextColor3 = isHov and Color3.fromRGB(230, 235, 245) or Color3.fromRGB(150, 155, 170)
+                        }):Play()
+                    else
+                        TweenService:Create(mObj.row, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                            BackgroundColor3 = isHov and Color3.fromRGB(32, 32, 40) or Color3.fromRGB(28, 28, 34)
+                        }):Play()
+                    end
+                end
             end
         end
 
@@ -3131,6 +3146,7 @@ end
                 local mode = initialMode
                 local boundKey = defaultKey
                 local toggleId = "toggle_" .. toggleName:gsub("%s+", "_"):lower()
+                local swatchBtnRef = nil
 
                 local Row = Instance.new("Frame")
                 Row.Name = "ToggleRow_" .. toggleName
@@ -3216,7 +3232,10 @@ end
                 local lastRowClickTime = 0
                 table.insert(clickableRegistry, {
                     object = Row,
-                    onClick = function()
+                    onClick = function(clickX, clickY)
+                        if swatchBtnRef and clickX and clickY and isInside(clickX, clickY, swatchBtnRef) then
+                            return
+                        end
                         local now = tick()
                         if hasKeybind and (now - lastRowClickTime) < 0.35 then
                             -- Double click detected! Reset / remove keybind!
@@ -3325,8 +3344,9 @@ end
                         SwatchBtn.Position = UDim2.new(1, -62, 0.5, -7)
                         SwatchBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
                         SwatchBtn.BorderSizePixel = 0
-                        SwatchBtn.ZIndex = 25
+                        SwatchBtn.ZIndex = 26
                         SwatchBtn.Parent = Row
+                        swatchBtnRef = SwatchBtn
 
                         local SwatchCorner = Instance.new("UICorner")
                         SwatchCorner.CornerRadius = UDim.new(0, 3)
@@ -3876,7 +3896,7 @@ end
                 end
 
                 table.insert(clickableRegistry, {
-                    object = SwatchBtn,
+                    object = Row,
                     onClick = function()
                         ColorPicker.Open(SwatchBtn, SwatchColor, curC, curA, onColorChanged)
                     end,
