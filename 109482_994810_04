@@ -15,6 +15,7 @@ local TweenService = cloneref(game:GetService("TweenService"))
 local GuiService = cloneref(game:GetService("GuiService"))
 
 local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer and LocalPlayer:GetMouse()
 
 -- Resolve safe container (gethui with fallback)
 local parentContainer = nil
@@ -807,6 +808,18 @@ ProfileCardStroke.Color = Color3.fromRGB(38, 38, 44)
 ProfileCardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 ProfileCardStroke.Parent = ProfileCard
 
+table.insert(clickableRegistry, {
+    object = ProfileCard,
+    onHover = function(isHovered)
+        TweenService:Create(ProfileCardStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+            Color = isHovered and Color3.fromRGB(56, 60, 74) or Color3.fromRGB(38, 38, 44)
+        }):Play()
+    end
+})
+
+-- Settings Popup Forward Declaration
+local SettingsPopup = nil
+
 -- 3 Dots Button (Positioned on the Left of the Profile Card)
 local ThreeDotsBtn = Instance.new("Frame")
 ThreeDotsBtn.Name = "ThreeDotsBtn"
@@ -840,14 +853,16 @@ ThreeDotsIcon.Parent = ThreeDotsBtn
 table.insert(clickableRegistry, {
     object = ThreeDotsBtn,
     onClick = function()
-        SettingsPopup.Visible = not SettingsPopup.Visible
+        if SettingsPopup then
+            SettingsPopup.Visible = not SettingsPopup.Visible
+        end
     end,
     onHover = function(isHovered)
         TweenService:Create(ThreeDotsBtn, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
             BackgroundColor3 = isHovered and Color3.fromRGB(36, 36, 44) or Color3.fromRGB(28, 28, 32)
         }):Play()
         TweenService:Create(ThreeDotsStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-            Color = isHovered and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(44, 44, 52)
+            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 44, 52)
         }):Play()
         TweenService:Create(ThreeDotsIcon, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
             TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 185, 200)
@@ -917,7 +932,7 @@ SubNameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 SubNameLabel.Parent = ProfileCard
 
 -- 3 Dots Settings Popup Menu (Clean square layout with 3 options)
-local SettingsPopup = Instance.new("Frame")
+SettingsPopup = Instance.new("Frame")
 SettingsPopup.Name = "SettingsPopup"
 SettingsPopup.Active = false
 SettingsPopup.Visible = false
@@ -1070,6 +1085,45 @@ KeybindsKnob.BackgroundColor3 = Color3.fromRGB(245, 245, 250)
 KeybindsKnob.BorderSizePixel = 0
 KeybindsKnob.ZIndex = 53
 KeybindsKnob.Parent = KeybindsToggle
+
+-- Register Settings Popup rows in clickableRegistry with Neverlose hover
+table.insert(clickableRegistry, {
+    object = WatermarkRow,
+    onClick = function()
+        if SettingsPopup.Visible then
+            toggleWatermark()
+        end
+    end,
+    onHover = function(isHovered)
+        if SettingsPopup.Visible then
+            TweenService:Create(WatermarkLabel, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 225, 235)
+            }):Play()
+            TweenService:Create(ToggleStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(50, 54, 66)
+            }):Play()
+        end
+    end
+})
+
+table.insert(clickableRegistry, {
+    object = KeybindsToggleRow,
+    onClick = function()
+        if SettingsPopup.Visible then
+            toggleKeybinds()
+        end
+    end,
+    onHover = function(isHovered)
+        if SettingsPopup.Visible then
+            TweenService:Create(KeybindsToggleLabel, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 225, 235)
+            }):Play()
+            TweenService:Create(KeybindsToggleStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(50, 54, 66)
+            }):Play()
+        end
+    end
+})
 
 -- Settings Option 3: Menu Key Info Row
 local KeybindRow = Instance.new("Frame")
@@ -1229,6 +1283,10 @@ local function toggleMenu(show)
                     pcall(item.onHover, false)
                 end
             end
+        end
+
+        if Mouse then
+            pcall(function() Mouse.Icon = "" end)
         end
 
         task.delay(0.14, function()
@@ -1696,17 +1754,38 @@ UserInputService.InputChanged:Connect(function(input)
         local mx = mousePos.X
         local my = mousePos.Y
 
+        local anyInteractiveHovered = false
+
         -- Neverlose-style dynamic smooth hover reactions (Zero-GPE)
         if MainFrame.Visible and menuOpen then
             for _, item in ipairs(clickableRegistry) do
-                if item.onHover and item.object then
+                if item.object then
                     local isHov = isInside(mx, my, item.object)
-                    if item._isHovered ~= isHov then
-                        item._isHovered = isHov
-                        pcall(item.onHover, isHov)
+                    if isHov then
+                        anyInteractiveHovered = true
+                    end
+                    if item.onHover then
+                        if item._isHovered ~= isHov then
+                            item._isHovered = isHov
+                            pcall(item.onHover, isHov)
+                        end
                     end
                 end
             end
+
+            for _, s in ipairs(sliderRegistry) do
+                if s.hitbox and isInside(mx, my, s.hitbox) then
+                    anyInteractiveHovered = true
+                    break
+                end
+            end
+        end
+
+        -- Update Pointing Hand cursor when hovering interactive elements
+        if Mouse then
+            pcall(function()
+                Mouse.Icon = anyInteractiveHovered and "rbxasset://SystemCursors/PointingHand" or ""
+            end)
         end
 
         if activeSlider then
@@ -2626,7 +2705,7 @@ end
                             BackgroundColor3 = isHovered and Color3.fromRGB(34, 34, 42) or Color3.fromRGB(26, 26, 32)
                         }):Play()
                         TweenService:Create(BtnStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(44, 46, 56)
+                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
                         }):Play()
                         TweenService:Create(BtnLabel, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
                             TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(225, 230, 240)
@@ -2839,7 +2918,7 @@ end
                             Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
                         }):Play()
                         TweenService:Create(ThumbStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(60, 64, 76)
+                            Color = isHovered and Color3.fromRGB(85, 92, 114) or Color3.fromRGB(60, 64, 76)
                         }):Play()
                     end
                 })
