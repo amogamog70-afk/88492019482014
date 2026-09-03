@@ -1880,6 +1880,8 @@ local ColorPicker = (function()
     local hexFrame, hexBox = createBox("HexBox", "HEX", 128, 8, 182)
     local aFrame, aBox = createBox("ABox", "A", 62, 142, 182)
 
+    local isUpdatingInputs = false
+
     local function syncUI(skipInputs)
         local solidColor = Color3.fromHSV(curH, curS, curV)
         SVCanvas.BackgroundColor3 = Color3.fromHSV(curH, 1, 1)
@@ -1891,11 +1893,13 @@ local ColorPicker = (function()
         PreviewColor.BackgroundTransparency = 1 - curA
 
         if not skipInputs then
+            isUpdatingInputs = true
             rBox.Text = tostring(math.clamp(math.floor(solidColor.R * 255 + 0.5), 0, 255))
             gBox.Text = tostring(math.clamp(math.floor(solidColor.G * 255 + 0.5), 0, 255))
             bBox.Text = tostring(math.clamp(math.floor(solidColor.B * 255 + 0.5), 0, 255))
             hexBox.Text = rgbToHex(solidColor)
             aBox.Text = tostring(math.clamp(math.floor(curA * 100 + 0.5), 0, 100))
+            isUpdatingInputs = false
         end
 
         if activeColorPicker then
@@ -1907,31 +1911,82 @@ local ColorPicker = (function()
         end
     end
 
+    rBox:GetPropertyChangedSignal("Text"):Connect(function()
+        if isUpdatingInputs then return end
+        local n = tonumber(rBox.Text)
+        if n and n >= 0 and n <= 255 then
+            local sc = Color3.fromHSV(curH, curS, curV)
+            local g = tonumber(gBox.Text) or math.floor(sc.G * 255 + 0.5)
+            local b = tonumber(bBox.Text) or math.floor(sc.B * 255 + 0.5)
+            local newC = Color3.fromRGB(n, math.clamp(g, 0, 255), math.clamp(b, 0, 255))
+            curH, curS, curV = Color3.toHSV(newC)
+            syncUI(true)
+        end
+    end)
+
     rBox.FocusLost:Connect(function()
-        local n = tonumber(rBox.Text:gsub("[^%d]", "")) or 0
-        n = math.clamp(n, 0, 255)
-        local solid = Color3.fromHSV(curH, curS, curV)
-        local newC = Color3.fromRGB(n, math.floor(solid.G * 255 + 0.5), math.floor(solid.B * 255 + 0.5))
+        local n = tonumber(rBox.Text) or 0
+        local sc = Color3.fromHSV(curH, curS, curV)
+        local g = tonumber(gBox.Text) or math.floor(sc.G * 255 + 0.5)
+        local b = tonumber(bBox.Text) or math.floor(sc.B * 255 + 0.5)
+        local newC = Color3.fromRGB(math.clamp(n, 0, 255), math.clamp(g, 0, 255), math.clamp(b, 0, 255))
         curH, curS, curV = Color3.toHSV(newC)
-        syncUI()
+        syncUI(false)
+    end)
+
+    gBox:GetPropertyChangedSignal("Text"):Connect(function()
+        if isUpdatingInputs then return end
+        local n = tonumber(gBox.Text)
+        if n and n >= 0 and n <= 255 then
+            local sc = Color3.fromHSV(curH, curS, curV)
+            local r = tonumber(rBox.Text) or math.floor(sc.R * 255 + 0.5)
+            local b = tonumber(bBox.Text) or math.floor(sc.B * 255 + 0.5)
+            local newC = Color3.fromRGB(math.clamp(r, 0, 255), n, math.clamp(b, 0, 255))
+            curH, curS, curV = Color3.toHSV(newC)
+            syncUI(true)
+        end
     end)
 
     gBox.FocusLost:Connect(function()
-        local n = tonumber(gBox.Text:gsub("[^%d]", "")) or 0
-        n = math.clamp(n, 0, 255)
-        local solid = Color3.fromHSV(curH, curS, curV)
-        local newC = Color3.fromRGB(math.floor(solid.R * 255 + 0.5), n, math.floor(solid.B * 255 + 0.5))
+        local n = tonumber(gBox.Text) or 0
+        local sc = Color3.fromHSV(curH, curS, curV)
+        local r = tonumber(rBox.Text) or math.floor(sc.R * 255 + 0.5)
+        local b = tonumber(bBox.Text) or math.floor(sc.B * 255 + 0.5)
+        local newC = Color3.fromRGB(math.clamp(r, 0, 255), math.clamp(n, 0, 255), math.clamp(b, 0, 255))
         curH, curS, curV = Color3.toHSV(newC)
-        syncUI()
+        syncUI(false)
+    end)
+
+    bBox:GetPropertyChangedSignal("Text"):Connect(function()
+        if isUpdatingInputs then return end
+        local n = tonumber(bBox.Text)
+        if n and n >= 0 and n <= 255 then
+            local sc = Color3.fromHSV(curH, curS, curV)
+            local r = tonumber(rBox.Text) or math.floor(sc.R * 255 + 0.5)
+            local g = tonumber(gBox.Text) or math.floor(sc.G * 255 + 0.5)
+            local newC = Color3.fromRGB(math.clamp(r, 0, 255), math.clamp(g, 0, 255), n)
+            curH, curS, curV = Color3.toHSV(newC)
+            syncUI(true)
+        end
     end)
 
     bBox.FocusLost:Connect(function()
-        local n = tonumber(bBox.Text:gsub("[^%d]", "")) or 0
-        n = math.clamp(n, 0, 255)
-        local solid = Color3.fromHSV(curH, curS, curV)
-        local newC = Color3.fromRGB(math.floor(solid.R * 255 + 0.5), math.floor(solid.G * 255 + 0.5), n)
+        local n = tonumber(bBox.Text) or 0
+        local sc = Color3.fromHSV(curH, curS, curV)
+        local r = tonumber(rBox.Text) or math.floor(sc.R * 255 + 0.5)
+        local g = tonumber(gBox.Text) or math.floor(sc.G * 255 + 0.5)
+        local newC = Color3.fromRGB(math.clamp(r, 0, 255), math.clamp(g, 0, 255), math.clamp(n, 0, 255))
         curH, curS, curV = Color3.toHSV(newC)
-        syncUI()
+        syncUI(false)
+    end)
+
+    hexBox:GetPropertyChangedSignal("Text"):Connect(function()
+        if isUpdatingInputs then return end
+        local c = hexToRgb(hexBox.Text)
+        if c then
+            curH, curS, curV = Color3.toHSV(c)
+            syncUI(true)
+        end
     end)
 
     hexBox.FocusLost:Connect(function()
@@ -1939,13 +1994,22 @@ local ColorPicker = (function()
         if c then
             curH, curS, curV = Color3.toHSV(c)
         end
-        syncUI()
+        syncUI(false)
+    end)
+
+    aBox:GetPropertyChangedSignal("Text"):Connect(function()
+        if isUpdatingInputs then return end
+        local n = tonumber(aBox.Text:gsub("[^%d]", ""))
+        if n and n >= 0 and n <= 100 then
+            curA = n / 100
+            syncUI(true)
+        end
     end)
 
     aBox.FocusLost:Connect(function()
         local n = tonumber(aBox.Text:gsub("[^%d]", "")) or 100
         curA = math.clamp(n, 0, 100) / 100
-        syncUI()
+        syncUI(false)
     end)
 
     local function open(anchorObj, swatchColor, defaultColor, defaultAlpha, callback)
@@ -1978,10 +2042,36 @@ local ColorPicker = (function()
 
         Window.Position = UDim2.fromOffset(targetX, targetY)
         Window.Visible = true
-        syncUI()
+        syncUI(false)
     end
 
     local function close()
+        if not Window.Visible then return end
+        local r = tonumber(rBox.Text)
+        local g = tonumber(gBox.Text)
+        local b = tonumber(bBox.Text)
+        if r and g and b then
+            local newC = Color3.fromRGB(math.clamp(r, 0, 255), math.clamp(g, 0, 255), math.clamp(b, 0, 255))
+            curH, curS, curV = Color3.toHSV(newC)
+        end
+        local c = hexToRgb(hexBox.Text)
+        if c then
+            curH, curS, curV = Color3.toHSV(c)
+        end
+        local n = tonumber(aBox.Text:gsub("[^%d]", ""))
+        if n then
+            curA = math.clamp(n, 0, 100) / 100
+        end
+        syncUI(false)
+
+        pcall(function()
+            rBox:ReleaseFocus()
+            gBox:ReleaseFocus()
+            bBox:ReleaseFocus()
+            hexBox:ReleaseFocus()
+            aBox:ReleaseFocus()
+        end)
+
         Window.Visible = false
         activeColorPicker = nil
         activeColorDrag = nil
@@ -2146,6 +2236,8 @@ CtxKeybindText.TextYAlignment = Enum.TextYAlignment.Center
 CtxKeybindText.ZIndex = 203
 CtxKeybindText.Parent = CtxKeybindRow
 
+local lastKeybindRowClickTime = 0
+
 -- Mode Rows: Always, Toggle, Hold
 local modeRowConfigs = {"Always", "Toggle", "Hold"}
 local modeButtons = {}
@@ -2266,6 +2358,23 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if ContextMenu.Visible then
             if isInside(clickX, clickY, ContextMenu) then
                 if isInside(clickX, clickY, CtxKeybindRow) then
+                    local now = tick()
+                    if (now - lastKeybindRowClickTime) < 0.35 then
+                        -- Rapid double-click detected on "Key: [ ... ]"! Reset / clear keybind!
+                        lastKeybindRowClickTime = 0
+                        isListeningKeybind = false
+                        if activeContextItem then
+                            if activeContextItem.resetKeybind then
+                                activeContextItem.resetKeybind()
+                            else
+                                activeContextItem.setKey(nil)
+                            end
+                        end
+                        updateContextMenuUI()
+                        return
+                    end
+                    lastKeybindRowClickTime = now
+
                     isListeningKeybind = not isListeningKeybind
                     updateContextMenuUI()
                     return
@@ -3339,21 +3448,12 @@ end
                     pcall(callback, state)
                 end
 
-                local lastRowClickTime = 0
                 table.insert(clickableRegistry, {
                     object = Row,
                     onClick = function(clickX, clickY)
                         if swatchBtnRef and clickX and clickY and isInside(clickX, clickY, swatchBtnRef) then
                             return
                         end
-                        local now = tick()
-                        if hasKeybind and (now - lastRowClickTime) < 0.35 then
-                            -- Double click detected! Reset / remove keybind!
-                            lastRowClickTime = 0
-                            resetKeybind()
-                            return
-                        end
-                        lastRowClickTime = now
 
                         if hasKeybind and mode == "always" then
                             setToggle(true)
