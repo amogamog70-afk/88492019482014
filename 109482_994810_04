@@ -832,6 +832,7 @@ ProfileCardStroke.Parent = ProfileCard
 
 table.insert(clickableRegistry, {
     object = ProfileCard,
+    onClick = function() end,
     onHover = function(isHovered)
         TweenService:Create(ProfileCardStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
             Color = isHovered and Color3.fromRGB(56, 60, 74) or Color3.fromRGB(38, 38, 44)
@@ -1913,8 +1914,18 @@ local ColorPicker = (function()
 
     rBox:GetPropertyChangedSignal("Text"):Connect(function()
         if isUpdatingInputs then return end
-        local n = tonumber(rBox.Text)
-        if n and n >= 0 and n <= 255 then
+        local clean = rBox.Text:gsub("[^%d]", "")
+        if #clean > 3 then
+            clean = clean:sub(1, 3)
+        end
+        if rBox.Text ~= clean then
+            isUpdatingInputs = true
+            rBox.Text = clean
+            isUpdatingInputs = false
+        end
+        local n = tonumber(clean)
+        if n then
+            n = math.clamp(n, 0, 255)
             local sc = Color3.fromHSV(curH, curS, curV)
             local g = tonumber(gBox.Text) or math.floor(sc.G * 255 + 0.5)
             local b = tonumber(bBox.Text) or math.floor(sc.B * 255 + 0.5)
@@ -1925,19 +1936,31 @@ local ColorPicker = (function()
     end)
 
     rBox.FocusLost:Connect(function()
-        local n = tonumber(rBox.Text) or 0
+        local clean = rBox.Text:gsub("[^%d]", "")
+        local n = tonumber(clean) or 0
+        n = math.clamp(n, 0, 255)
         local sc = Color3.fromHSV(curH, curS, curV)
         local g = tonumber(gBox.Text) or math.floor(sc.G * 255 + 0.5)
         local b = tonumber(bBox.Text) or math.floor(sc.B * 255 + 0.5)
-        local newC = Color3.fromRGB(math.clamp(n, 0, 255), math.clamp(g, 0, 255), math.clamp(b, 0, 255))
+        local newC = Color3.fromRGB(n, math.clamp(g, 0, 255), math.clamp(b, 0, 255))
         curH, curS, curV = Color3.toHSV(newC)
         syncUI(false)
     end)
 
     gBox:GetPropertyChangedSignal("Text"):Connect(function()
         if isUpdatingInputs then return end
-        local n = tonumber(gBox.Text)
-        if n and n >= 0 and n <= 255 then
+        local clean = gBox.Text:gsub("[^%d]", "")
+        if #clean > 3 then
+            clean = clean:sub(1, 3)
+        end
+        if gBox.Text ~= clean then
+            isUpdatingInputs = true
+            gBox.Text = clean
+            isUpdatingInputs = false
+        end
+        local n = tonumber(clean)
+        if n then
+            n = math.clamp(n, 0, 255)
             local sc = Color3.fromHSV(curH, curS, curV)
             local r = tonumber(rBox.Text) or math.floor(sc.R * 255 + 0.5)
             local b = tonumber(bBox.Text) or math.floor(sc.B * 255 + 0.5)
@@ -1948,19 +1971,31 @@ local ColorPicker = (function()
     end)
 
     gBox.FocusLost:Connect(function()
-        local n = tonumber(gBox.Text) or 0
+        local clean = gBox.Text:gsub("[^%d]", "")
+        local n = tonumber(clean) or 0
+        n = math.clamp(n, 0, 255)
         local sc = Color3.fromHSV(curH, curS, curV)
         local r = tonumber(rBox.Text) or math.floor(sc.R * 255 + 0.5)
         local b = tonumber(bBox.Text) or math.floor(sc.B * 255 + 0.5)
-        local newC = Color3.fromRGB(math.clamp(r, 0, 255), math.clamp(n, 0, 255), math.clamp(b, 0, 255))
+        local newC = Color3.fromRGB(math.clamp(r, 0, 255), n, math.clamp(b, 0, 255))
         curH, curS, curV = Color3.toHSV(newC)
         syncUI(false)
     end)
 
     bBox:GetPropertyChangedSignal("Text"):Connect(function()
         if isUpdatingInputs then return end
-        local n = tonumber(bBox.Text)
-        if n and n >= 0 and n <= 255 then
+        local clean = bBox.Text:gsub("[^%d]", "")
+        if #clean > 3 then
+            clean = clean:sub(1, 3)
+        end
+        if bBox.Text ~= clean then
+            isUpdatingInputs = true
+            bBox.Text = clean
+            isUpdatingInputs = false
+        end
+        local n = tonumber(clean)
+        if n then
+            n = math.clamp(n, 0, 255)
             local sc = Color3.fromHSV(curH, curS, curV)
             local r = tonumber(rBox.Text) or math.floor(sc.R * 255 + 0.5)
             local g = tonumber(gBox.Text) or math.floor(sc.G * 255 + 0.5)
@@ -1971,17 +2006,24 @@ local ColorPicker = (function()
     end)
 
     bBox.FocusLost:Connect(function()
-        local n = tonumber(bBox.Text) or 0
+        local clean = bBox.Text:gsub("[^%d]", "")
+        local n = tonumber(clean) or 0
+        n = math.clamp(n, 0, 255)
         local sc = Color3.fromHSV(curH, curS, curV)
         local r = tonumber(rBox.Text) or math.floor(sc.R * 255 + 0.5)
         local g = tonumber(gBox.Text) or math.floor(sc.G * 255 + 0.5)
-        local newC = Color3.fromRGB(math.clamp(r, 0, 255), math.clamp(g, 0, 255), math.clamp(n, 0, 255))
+        local newC = Color3.fromRGB(math.clamp(r, 0, 255), math.clamp(g, 0, 255), n)
         curH, curS, curV = Color3.toHSV(newC)
         syncUI(false)
     end)
 
     hexBox:GetPropertyChangedSignal("Text"):Connect(function()
         if isUpdatingInputs then return end
+        if #hexBox.Text > 7 then
+            isUpdatingInputs = true
+            hexBox.Text = hexBox.Text:sub(1, 7)
+            isUpdatingInputs = false
+        end
         local c = hexToRgb(hexBox.Text)
         if c then
             curH, curS, curV = Color3.toHSV(c)
@@ -1999,9 +2041,18 @@ local ColorPicker = (function()
 
     aBox:GetPropertyChangedSignal("Text"):Connect(function()
         if isUpdatingInputs then return end
-        local cleanA = aBox.Text:gsub("[^%d]", "")
-        local n = tonumber(cleanA)
-        if n and n >= 0 and n <= 100 then
+        local clean = aBox.Text:gsub("[^%d]", "")
+        if #clean > 3 then
+            clean = clean:sub(1, 3)
+        end
+        if aBox.Text ~= clean then
+            isUpdatingInputs = true
+            aBox.Text = clean
+            isUpdatingInputs = false
+        end
+        local n = tonumber(clean)
+        if n then
+            n = math.clamp(n, 0, 100)
             curA = n / 100
             syncUI(true)
         end
@@ -2460,7 +2511,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             for i = #clickableRegistry, 1, -1 do
                 local item = clickableRegistry[i]
                 if item.object and isInside(clickX, clickY, item.object) then
-                    item.onClick(clickX, clickY)
+                    if item.onClick then
+                        pcall(item.onClick, clickX, clickY)
+                    end
                     return
                 end
             end
@@ -3893,6 +3946,7 @@ end
 
                 table.insert(clickableRegistry, {
                     object = TrackHitbox,
+                    onClick = function() end,
                     onHover = function(isHovered)
                         TweenService:Create(TrackStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
                             Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
