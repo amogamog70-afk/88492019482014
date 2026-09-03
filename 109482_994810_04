@@ -13,6 +13,7 @@ local RunService = cloneref(game:GetService("RunService"))
 local Stats = cloneref(game:GetService("Stats"))
 local TweenService = cloneref(game:GetService("TweenService"))
 local GuiService = cloneref(game:GetService("GuiService"))
+local HttpService = cloneref(game:GetService("HttpService"))
 
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer and LocalPlayer:GetMouse()
@@ -54,7 +55,11 @@ DeadHub.Icons = {
     WeaponMods = "rbxassetid://129538899181716",
     Auto = "rbxassetid://12690726311",
     Misc = "rbxassetid://8622237899",
-    Settings = "rbxassetid://8622237899"
+    Settings = "rbxassetid://8622237899",
+    Save = "rbxassetid://74169124489941",
+    Load = "rbxassetid://77232797873154",
+    Delete = "rbxassetid://119832272702307",
+    Configs = "rbxassetid://74169124489941"
 }
 
 local defaultTabIcons = {
@@ -474,6 +479,8 @@ local clickableRegistry = {}
 local sliderRegistry = {}
 local rightClickRegistry = {}
 local keybindItems = {}
+local configRegistry = {}
+local ConfigManager = nil
 
 local function updateKeybindsLayout()
     local hasItems = next(keybindItems) ~= nil
@@ -656,6 +663,599 @@ Subtitle.TextXAlignment = Enum.TextXAlignment.Left
 Subtitle.TextYAlignment = Enum.TextYAlignment.Center
 Subtitle.TextTruncate = Enum.TextTruncate.AtEnd
 Subtitle.Parent = Header
+
+-- ====================================================================
+-- Neverlose-Style Header Config Manager (Positioned directly to the right of Title)
+-- ====================================================================
+local activeConfigName = "default"
+local isCfgDropdownOpen = false
+local dropdownRows = {}
+
+local function ensureConfigDir()
+    pcall(function()
+        if isfolder and makefolder then
+            if not isfolder("DeadHub") then makefolder("DeadHub") end
+            if not isfolder("DeadHub/Configs") then makefolder("DeadHub/Configs") end
+        end
+    end)
+end
+
+local function getSavedConfigNames()
+    ensureConfigDir()
+    local names = {}
+    local seen = {}
+
+    pcall(function()
+        if isfolder and listfiles and isfolder("DeadHub/Configs") then
+            for _, path in ipairs(listfiles("DeadHub/Configs")) do
+                local fileName = path:match("([^/\\]+)%.json$")
+                if fileName and not seen[fileName] then
+                    seen[fileName] = true
+                    table.insert(names, fileName)
+                end
+            end
+        end
+    end)
+
+    table.sort(names)
+    if #names == 0 then
+        table.insert(names, "default")
+    end
+    return names
+end
+
+-- Header Config Bar Container (Neverlose-style Dark Steel Frame)
+local HeaderConfigBar = Instance.new("Frame")
+HeaderConfigBar.Name = "HeaderConfigBar"
+HeaderConfigBar.Active = false
+HeaderConfigBar.Size = UDim2.new(0, 428, 0, 28)
+HeaderConfigBar.Position = UDim2.new(0, 192, 0.5, -14)
+HeaderConfigBar.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+HeaderConfigBar.BorderSizePixel = 0
+HeaderConfigBar.ZIndex = 50
+HeaderConfigBar.Parent = Header
+
+local hcbCorner = Instance.new("UICorner")
+hcbCorner.CornerRadius = UDim.new(0, 4)
+hcbCorner.Parent = HeaderConfigBar
+
+local hcbStroke = Instance.new("UIStroke")
+hcbStroke.Thickness = 1
+hcbStroke.Color = Color3.fromRGB(40, 42, 52)
+hcbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+hcbStroke.Parent = HeaderConfigBar
+
+-- 1. Active Config Dropdown Trigger Button
+local CfgSelectBtn = Instance.new("Frame")
+CfgSelectBtn.Name = "CfgSelectBtn"
+CfgSelectBtn.Active = false
+CfgSelectBtn.Size = UDim2.new(0, 118, 0, 22)
+CfgSelectBtn.Position = UDim2.new(0, 3, 0.5, -11)
+CfgSelectBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+CfgSelectBtn.BorderSizePixel = 0
+CfgSelectBtn.ZIndex = 51
+CfgSelectBtn.Parent = HeaderConfigBar
+
+local csCorner = Instance.new("UICorner")
+csCorner.CornerRadius = UDim.new(0, 3)
+csCorner.Parent = CfgSelectBtn
+
+local csStroke = Instance.new("UIStroke")
+csStroke.Thickness = 1
+csStroke.Color = Color3.fromRGB(44, 46, 56)
+csStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+csStroke.Parent = CfgSelectBtn
+
+local csIcon = Instance.new("ImageLabel")
+csIcon.Name = "Icon"
+csIcon.Active = false
+csIcon.Size = UDim2.new(0, 12, 0, 12)
+csIcon.Position = UDim2.new(0, 6, 0.5, -6)
+csIcon.BackgroundTransparency = 1
+csIcon.Image = "rbxassetid://74169124489941"
+csIcon.ImageColor3 = Color3.fromRGB(230, 57, 70)
+csIcon.ZIndex = 52
+csIcon.Parent = CfgSelectBtn
+
+local SelectedCfgLabel = Instance.new("TextLabel")
+SelectedCfgLabel.Name = "Label"
+SelectedCfgLabel.Active = false
+SelectedCfgLabel.Size = UDim2.new(1, -32, 1, 0)
+SelectedCfgLabel.Position = UDim2.new(0, 20, 0, 0)
+SelectedCfgLabel.BackgroundTransparency = 1
+SelectedCfgLabel.Font = ThemeFontBold
+SelectedCfgLabel.Text = activeConfigName
+SelectedCfgLabel.TextSize = 11
+SelectedCfgLabel.TextColor3 = Color3.fromRGB(225, 230, 245)
+SelectedCfgLabel.TextXAlignment = Enum.TextXAlignment.Left
+SelectedCfgLabel.TextYAlignment = Enum.TextYAlignment.Center
+SelectedCfgLabel.TextTruncate = Enum.TextTruncate.AtEnd
+SelectedCfgLabel.ZIndex = 52
+SelectedCfgLabel.Parent = CfgSelectBtn
+
+local csArrow = Instance.new("TextLabel")
+csArrow.Name = "Arrow"
+csArrow.Active = false
+csArrow.Size = UDim2.new(0, 12, 1, 0)
+csArrow.Position = UDim2.new(1, -14, 0, 0)
+csArrow.BackgroundTransparency = 1
+csArrow.Font = ThemeFontBold
+csArrow.Text = "v"
+csArrow.TextSize = 9
+csArrow.TextColor3 = Color3.fromRGB(140, 145, 160)
+csArrow.TextXAlignment = Enum.TextXAlignment.Center
+csArrow.TextYAlignment = Enum.TextYAlignment.Center
+csArrow.ZIndex = 52
+csArrow.Parent = CfgSelectBtn
+
+-- Floating Dropdown Window
+local CfgDropdownWindow = Instance.new("Frame")
+CfgDropdownWindow.Name = "DH_CfgDropdownWindow"
+CfgDropdownWindow.Active = false
+CfgDropdownWindow.Visible = false
+CfgDropdownWindow.Size = UDim2.new(0, 122, 0, 110)
+CfgDropdownWindow.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+CfgDropdownWindow.BorderSizePixel = 0
+CfgDropdownWindow.ZIndex = 600
+CfgDropdownWindow.ClipsDescendants = true
+CfgDropdownWindow.Parent = ScreenGui
+
+local cdwCorner = Instance.new("UICorner")
+cdwCorner.CornerRadius = UDim.new(0, 4)
+cdwCorner.Parent = CfgDropdownWindow
+
+local cdwStroke = Instance.new("UIStroke")
+cdwStroke.Thickness = 1
+cdwStroke.Color = Color3.fromRGB(44, 46, 56)
+cdwStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+cdwStroke.Parent = CfgDropdownWindow
+
+local CfgScroll = Instance.new("ScrollingFrame")
+CfgScroll.Name = "Scroll"
+CfgScroll.Active = false
+CfgScroll.Size = UDim2.new(1, -4, 1, -4)
+CfgScroll.Position = UDim2.new(0, 2, 0, 2)
+CfgScroll.BackgroundTransparency = 1
+CfgScroll.BorderSizePixel = 0
+CfgScroll.ScrollBarThickness = 3
+CfgScroll.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
+CfgScroll.ZIndex = 601
+CfgScroll.Parent = CfgDropdownWindow
+
+local cdwLayout = Instance.new("UIListLayout")
+cdwLayout.FillDirection = Enum.FillDirection.Vertical
+cdwLayout.SortOrder = Enum.SortOrder.LayoutOrder
+cdwLayout.Padding = UDim.new(0, 2)
+cdwLayout.Parent = CfgScroll
+
+-- 2. Separator 1
+local Div1 = Instance.new("Frame")
+Div1.Name = "Div1"
+Div1.Active = false
+Div1.Size = UDim2.new(0, 1, 0, 16)
+Div1.Position = UDim2.new(0, 125, 0.5, -8)
+Div1.BackgroundColor3 = Color3.fromRGB(38, 40, 50)
+Div1.BorderSizePixel = 0
+Div1.ZIndex = 51
+Div1.Parent = HeaderConfigBar
+
+-- 3. Config Name Input Box
+local CfgInputFrame = Instance.new("Frame")
+CfgInputFrame.Name = "CfgInputFrame"
+CfgInputFrame.Active = false
+CfgInputFrame.Size = UDim2.new(0, 115, 0, 22)
+CfgInputFrame.Position = UDim2.new(0, 130, 0.5, -11)
+CfgInputFrame.BackgroundColor3 = Color3.fromRGB(16, 16, 20)
+CfgInputFrame.BorderSizePixel = 0
+CfgInputFrame.ZIndex = 51
+CfgInputFrame.Parent = HeaderConfigBar
+
+local ciCorner = Instance.new("UICorner")
+ciCorner.CornerRadius = UDim.new(0, 3)
+ciCorner.Parent = CfgInputFrame
+
+local ciStroke = Instance.new("UIStroke")
+ciStroke.Thickness = 1
+ciStroke.Color = Color3.fromRGB(40, 42, 52)
+ciStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+ciStroke.Parent = CfgInputFrame
+
+local ConfigInput = Instance.new("TextBox")
+ConfigInput.Name = "ConfigInput"
+ConfigInput.Active = true
+ConfigInput.Size = UDim2.new(1, -8, 1, 0)
+ConfigInput.Position = UDim2.new(0, 4, 0, 0)
+ConfigInput.BackgroundTransparency = 1
+ConfigInput.Font = ThemeFont
+ConfigInput.PlaceholderText = "Config name..."
+ConfigInput.PlaceholderColor3 = Color3.fromRGB(115, 120, 135)
+ConfigInput.Text = activeConfigName
+ConfigInput.TextSize = 10
+ConfigInput.TextColor3 = Color3.fromRGB(240, 240, 250)
+ConfigInput.TextXAlignment = Enum.TextXAlignment.Left
+ConfigInput.ClearTextOnFocus = false
+ConfigInput.ZIndex = 52
+ConfigInput.Parent = CfgInputFrame
+
+-- 4. Separator 2
+local Div2 = Instance.new("Frame")
+Div2.Name = "Div2"
+Div2.Active = false
+Div2.Size = UDim2.new(0, 1, 0, 16)
+Div2.Position = UDim2.new(0, 249, 0.5, -8)
+Div2.BackgroundColor3 = Color3.fromRGB(38, 40, 50)
+Div2.BorderSizePixel = 0
+Div2.ZIndex = 51
+Div2.Parent = HeaderConfigBar
+
+-- Notification Toast
+local ConfigToast = Instance.new("TextLabel")
+ConfigToast.Name = "ConfigToast"
+ConfigToast.Active = false
+ConfigToast.Size = UDim2.new(0, 240, 0, 14)
+ConfigToast.Position = UDim2.new(0, 194, 1, -13)
+ConfigToast.BackgroundTransparency = 1
+ConfigToast.Font = ThemeFontBold
+ConfigToast.Text = ""
+ConfigToast.TextSize = 10
+ConfigToast.TextColor3 = Color3.fromRGB(100, 220, 120)
+ConfigToast.TextXAlignment = Enum.TextXAlignment.Left
+ConfigToast.ZIndex = 52
+ConfigToast.Parent = Header
+
+local function showToast(msg, isSuccess)
+    ConfigToast.Text = msg
+    ConfigToast.TextColor3 = isSuccess and Color3.fromRGB(100, 220, 120) or Color3.fromRGB(230, 80, 90)
+    task.delay(3.5, function()
+        if ConfigToast.Text == msg then
+            ConfigToast.Text = ""
+        end
+    end)
+end
+
+local function closeDropdown()
+    isCfgDropdownOpen = false
+    CfgDropdownWindow.Visible = false
+    csArrow.Text = "v"
+end
+
+local function selectConfig(name)
+    activeConfigName = name
+    SelectedCfgLabel.Text = name
+    ConfigInput.Text = name
+    closeDropdown()
+end
+
+local function openDropdown()
+    if isCfgDropdownOpen then
+        closeDropdown()
+        return
+    end
+
+    for _, row in ipairs(dropdownRows) do
+        if row.frame then pcall(function() row.frame:Destroy() end) end
+    end
+    dropdownRows = {}
+
+    local names = getSavedConfigNames()
+    local rowH = 22
+    CfgScroll.CanvasSize = UDim2.new(0, 0, 0, #names * (rowH + 2) + 4)
+
+    for _, name in ipairs(names) do
+        local r = Instance.new("Frame")
+        r.Name = "Row_" .. name
+        r.Active = false
+        r.Size = UDim2.new(1, 0, 0, rowH)
+        r.BackgroundColor3 = (activeConfigName == name) and Color3.fromRGB(36, 22, 26) or Color3.fromRGB(24, 24, 28)
+        r.BorderSizePixel = 0
+        r.ZIndex = 602
+        r.Parent = CfgScroll
+
+        local rCorner = Instance.new("UICorner")
+        rCorner.CornerRadius = UDim.new(0, 3)
+        rCorner.Parent = r
+
+        local rStroke = Instance.new("UIStroke")
+        rStroke.Thickness = 1
+        rStroke.Color = (activeConfigName == name) and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(38, 40, 48)
+        rStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        rStroke.Parent = r
+
+        local rLbl = Instance.new("TextLabel")
+        rLbl.Name = "Text"
+        rLbl.Active = false
+        rLbl.Size = UDim2.new(1, -12, 1, 0)
+        rLbl.Position = UDim2.new(0, 8, 0, 0)
+        rLbl.BackgroundTransparency = 1
+        rLbl.Font = (activeConfigName == name) and ThemeFontBold or ThemeFont
+        rLbl.Text = name
+        rLbl.TextSize = 10
+        rLbl.TextColor3 = (activeConfigName == name) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(165, 170, 185)
+        rLbl.TextXAlignment = Enum.TextXAlignment.Left
+        rLbl.TextYAlignment = Enum.TextYAlignment.Center
+        rLbl.ZIndex = 603
+        rLbl.Parent = r
+
+        table.insert(dropdownRows, {
+            name = name,
+            frame = r,
+            stroke = rStroke,
+            label = rLbl
+        })
+    end
+
+    local ap = CfgSelectBtn.AbsolutePosition
+    local as = CfgSelectBtn.AbsoluteSize
+    CfgDropdownWindow.Position = UDim2.fromOffset(ap.X, ap.Y + as.Y + 3)
+    CfgDropdownWindow.Visible = true
+    isCfgDropdownOpen = true
+    csArrow.Text = "^"
+end
+
+local function serializeCurrentConfig()
+    local data = {}
+    for key, item in pairs(configRegistry) do
+        pcall(function()
+            local val = item.get()
+            if typeof(val) == "Color3" then
+                data[key] = { __type = "Color3", r = val.R, g = val.G, b = val.B }
+            else
+                data[key] = val
+            end
+        end)
+    end
+    return data
+end
+
+local function applyLoadedConfig(data)
+    if type(data) ~= "table" then return false end
+    for key, val in pairs(data) do
+        local item = configRegistry[key]
+        if item and item.set then
+            pcall(function()
+                if type(val) == "table" and val.__type == "Color3" then
+                    item.set(Color3.new(val.r, val.g, val.b))
+                else
+                    item.set(val)
+                end
+            end)
+        end
+    end
+    return true
+end
+
+local function saveConfig(name)
+    name = name or ConfigInput.Text
+    if not name or #name == 0 then
+        showToast("Enter a config name", false)
+        return
+    end
+    name = name:gsub("[^%w_%-]", "")
+    if #name == 0 then
+        showToast("Invalid config name", false)
+        return
+    end
+
+    local data = serializeCurrentConfig()
+    local success = false
+    pcall(function()
+        ensureConfigDir()
+        if writefile then
+            local json = HttpService:JSONEncode(data)
+            writefile("DeadHub/Configs/" .. name .. ".json", json)
+            success = true
+        end
+    end)
+
+    if success then
+        activeConfigName = name
+        SelectedCfgLabel.Text = name
+        ConfigInput.Text = name
+        showToast("Saved to PC: \"" .. name .. ".json\"", true)
+    else
+        showToast("Failed to write to PC disk", false)
+    end
+end
+
+local function loadConfig(name)
+    name = name or activeConfigName
+    if not name or #name == 0 then
+        showToast("Select a config", false)
+        return
+    end
+    name = name:gsub("[^%w_%-]", "")
+
+    local data = nil
+    local found = false
+    pcall(function()
+        ensureConfigDir()
+        if readfile and isfile and isfile("DeadHub/Configs/" .. name .. ".json") then
+            local content = readfile("DeadHub/Configs/" .. name .. ".json")
+            data = HttpService:JSONDecode(content)
+            found = true
+        end
+    end)
+
+    if not found then
+        showToast("File not found on PC: " .. name .. ".json", false)
+        return
+    end
+
+    if data and applyLoadedConfig(data) then
+        activeConfigName = name
+        SelectedCfgLabel.Text = name
+        ConfigInput.Text = name
+        showToast("Loaded from PC: \"" .. name .. ".json\"", true)
+    else
+        showToast("Failed to parse PC config", false)
+    end
+end
+
+local function deleteConfig(name)
+    name = name or activeConfigName
+    if not name or #name == 0 then
+        showToast("Select a config", false)
+        return
+    end
+    name = name:gsub("[^%w_%-]", "")
+
+    local success = false
+    pcall(function()
+        if delfile and isfile and isfile("DeadHub/Configs/" .. name .. ".json") then
+            delfile("DeadHub/Configs/" .. name .. ".json")
+            success = true
+        end
+    end)
+
+    if success then
+        local names = getSavedConfigNames()
+        activeConfigName = names[1] or "default"
+        SelectedCfgLabel.Text = activeConfigName
+        ConfigInput.Text = activeConfigName
+        showToast("Deleted from PC: \"" .. name .. ".json\"", true)
+    else
+        showToast("File not found on PC to delete", false)
+    end
+end
+
+-- 5. Action Buttons Frame: Save, Load, Delete (Horizontal, side-by-side)
+local function createHeaderActionBtn(btnName, text, posX, iconId, accentColor, bgBase, borderBase, onClickFn)
+    local btn = Instance.new("Frame")
+    btn.Name = "Btn_" .. btnName
+    btn.Active = false
+    btn.Size = UDim2.new(0, 54, 0, 22)
+    btn.Position = UDim2.new(0, posX, 0.5, -11)
+    btn.BackgroundColor3 = bgBase
+    btn.BorderSizePixel = 0
+    btn.ZIndex = 51
+    btn.Parent = HeaderConfigBar
+
+    local bCorner = Instance.new("UICorner")
+    bCorner.CornerRadius = UDim.new(0, 3)
+    bCorner.Parent = btn
+
+    local bStroke = Instance.new("UIStroke")
+    bStroke.Thickness = 1
+    bStroke.Color = borderBase
+    bStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    bStroke.Parent = btn
+
+    local bIcon = Instance.new("ImageLabel")
+    bIcon.Name = "Icon"
+    bIcon.Active = false
+    bIcon.Size = UDim2.new(0, 12, 0, 12)
+    bIcon.Position = UDim2.new(0, 5, 0.5, -6)
+    bIcon.BackgroundTransparency = 1
+    bIcon.Image = "rbxassetid://" .. tostring(iconId)
+    bIcon.ImageColor3 = accentColor
+    bIcon.ZIndex = 52
+    bIcon.Parent = btn
+
+    local bText = Instance.new("TextLabel")
+    bText.Name = "Text"
+    bText.Active = false
+    bText.Size = UDim2.new(1, -20, 1, 0)
+    bText.Position = UDim2.new(0, 18, 0, 0)
+    bText.BackgroundTransparency = 1
+    bText.Font = ThemeFontBold
+    bText.Text = text
+    bText.TextSize = 10
+    bText.TextColor3 = Color3.fromRGB(225, 230, 240)
+    bText.TextXAlignment = Enum.TextXAlignment.Center
+    bText.TextYAlignment = Enum.TextYAlignment.Center
+    bText.ZIndex = 52
+    bText.Parent = btn
+
+    table.insert(clickableRegistry, {
+        object = btn,
+        onClick = onClickFn,
+        onHover = function(isHov)
+            TweenService:Create(bStroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                Color = isHov and accentColor or borderBase
+            }):Play()
+            TweenService:Create(btn, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+                BackgroundColor3 = isHov and Color3.fromRGB(32, 32, 38) or bgBase
+            }):Play()
+        end
+    })
+
+    return btn
+end
+
+-- Wire up Dropdown Trigger Click & Hover
+table.insert(clickableRegistry, {
+    object = CfgSelectBtn,
+    onClick = openDropdown,
+    onHover = function(isHov)
+        TweenService:Create(csStroke, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+            Color = isHov and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(44, 46, 56)
+        }):Play()
+        TweenService:Create(CfgSelectBtn, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
+            BackgroundColor3 = isHov and Color3.fromRGB(32, 32, 38) or Color3.fromRGB(26, 26, 32)
+        }):Play()
+    end
+})
+
+-- Wire up 3 Header Action Buttons with user's exact icons:
+-- Save: 74169124489941
+createHeaderActionBtn("Save", "Save", 254, "74169124489941", Color3.fromRGB(80, 210, 120), Color3.fromRGB(24, 28, 24), Color3.fromRGB(44, 56, 46), function()
+    saveConfig(ConfigInput.Text)
+end)
+
+-- Load: 77232797873154
+createHeaderActionBtn("Load", "Load", 312, "77232797873154", Color3.fromRGB(230, 57, 70), Color3.fromRGB(32, 22, 26), Color3.fromRGB(230, 57, 70), function()
+    loadConfig(activeConfigName)
+end)
+
+-- Delete: 119832272702307
+createHeaderActionBtn("Del", "Del", 370, "119832272702307", Color3.fromRGB(240, 80, 80), Color3.fromRGB(28, 22, 24), Color3.fromRGB(56, 40, 44), function()
+    deleteConfig(activeConfigName)
+end)
+
+ConfigManager = {
+    Save = saveConfig,
+    Load = loadConfig,
+    Delete = deleteConfig,
+    Open = openDropdown,
+    Close = closeDropdown,
+    IsVisible = function() return isCfgDropdownOpen end,
+    Window = CfgDropdownWindow,
+    HandleClick = function(clickX, clickY)
+        if not isCfgDropdownOpen then return false end
+        if isInside(clickX, clickY, CfgDropdownWindow) then
+            for _, r in ipairs(dropdownRows) do
+                if isInside(clickX, clickY, r.frame) then
+                    selectConfig(r.name)
+                    return true
+                end
+            end
+            return true
+        else
+            closeDropdown()
+            return true
+        end
+    end,
+    HandleHover = function(mx, my)
+        if not isCfgDropdownOpen then return false end
+        if not isInside(mx, my, CfgDropdownWindow) then return false end
+        for _, r in ipairs(dropdownRows) do
+            local isHov = isInside(mx, my, r.frame)
+            local isSel = (r.name == activeConfigName)
+            if not isSel then
+                r.stroke.Color = isHov and Color3.fromRGB(65, 70, 85) or Color3.fromRGB(38, 40, 48)
+                r.frame.BackgroundColor3 = isHov and Color3.fromRGB(30, 30, 36) or Color3.fromRGB(24, 24, 28)
+            end
+        end
+        return true
+    end,
+    HandleWheel = function(deltaZ)
+        if not isCfgDropdownOpen then return false end
+        local maxScroll = math.max(0, CfgScroll.CanvasSize.Y.Offset - CfgScroll.AbsoluteWindowSize.Y)
+        local newY = math.clamp(CfgScroll.CanvasPosition.Y - deltaZ * 20, 0, maxScroll)
+        CfgScroll.CanvasPosition = Vector2.new(0, newY)
+        return true
+    end
+}
 
 -- Right Header Section: System & Session Metadata Badges (Time & Memory Usage)
 local HeaderStats = Instance.new("Frame")
@@ -1367,6 +1967,10 @@ local function toggleMenu(show)
 
         if DropdownOverlay then
             DropdownOverlay.Close()
+        end
+
+        if ConfigManager then
+            ConfigManager.Close()
         end
 
         if isListeningMenuKey then
@@ -2732,6 +3336,13 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             end
         end
 
+        -- Priority hit-test: Config Manager Window
+        if ConfigManager.IsVisible() then
+            if ConfigManager.HandleClick(clickX, clickY) then
+                return
+            end
+        end
+
         -- Priority hit-test: Context Menu Modal Overlay
         -- While open, user can ONLY interact with Context Menu until closed!
         if ContextMenu.Visible then
@@ -2857,6 +3468,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             return
         end
 
+        if ConfigManager.IsVisible() then
+            ConfigManager.Close()
+            return
+        end
+
         if ContextMenu.Visible then
             ContextMenu.Visible = false
             isListeningKeybind = false
@@ -2969,7 +3585,17 @@ UserInputService.InputChanged:Connect(function(input)
 
         -- Neverlose-style dynamic smooth hover reactions (Zero-GPE)
         if MainFrame.Visible and menuOpen then
-            if DropdownOverlay.IsVisible() then
+            if ConfigManager.IsVisible() then
+                for _, item in ipairs(clickableRegistry) do
+                    if item._isHovered then
+                        item._isHovered = false
+                        if item.onHover then pcall(item.onHover, false) end
+                    end
+                end
+                if ConfigManager.HandleHover(mx, my) then
+                    anyInteractiveHovered = true
+                end
+            elseif DropdownOverlay.IsVisible() then
                 for _, item in ipairs(clickableRegistry) do
                     if item._isHovered then
                         item._isHovered = false
@@ -3112,6 +3738,11 @@ UserInputService.InputChanged:Connect(function(input)
         local inset = GuiService:GetGuiInset()
         local mx = mouse.X - inset.X
         local my = mouse.Y - inset.Y
+
+        if ConfigManager.IsVisible() and isInside(mx, my, ConfigManager.Window) then
+            ConfigManager.HandleWheel(scrollDelta)
+            return
+        end
 
         if DropdownOverlay.IsVisible() and isInside(mx, my, DropdownOverlay.Window) then
             DropdownOverlay.HandleWheel(scrollDelta)
@@ -3333,6 +3964,19 @@ end
     Window.MainFrame = MainFrame
     Window.Watermark = WatermarkFrame
     Window.Keybinds = KeybindsFrame
+    Window.ConfigManager = ConfigManager
+
+    function Window:SaveConfig(name)
+        ConfigManager.Save(name)
+    end
+
+    function Window:LoadConfig(name)
+        ConfigManager.Load(name)
+    end
+
+    function Window:DeleteConfig(name)
+        ConfigManager.Delete(name)
+    end
 
     function Window:SetTitle(newTitle)
         windowTitle = tostring(newTitle)
@@ -4011,6 +4655,12 @@ end
                     end
                 }
 
+                configRegistry[toggleName] = {
+                    type = "toggle",
+                    get = function() return state end,
+                    set = function(v) toggleObj:Set(v) end
+                }
+
                 return toggleObj
             end
 
@@ -4350,6 +5000,12 @@ end
                 end)
 
 
+                configRegistry[sliderName] = {
+                    type = "slider",
+                    get = function() return curVal end,
+                    set = function(v) setSlider(v) end
+                }
+
                 return {
                     Set = function(self, v) setSlider(v) end,
                     Get = function(self) return curVal end
@@ -4652,6 +5308,15 @@ end
                     end
                 })
 
+                configRegistry[dpName] = {
+                    type = "dropdown",
+                    get = function() return currentVal end,
+                    set = function(val)
+                        updateDisplay(val)
+                        pcall(callback, val)
+                    end
+                }
+
                 return {
                     Set = function(self, val)
                         updateDisplay(val)
@@ -4800,6 +5465,18 @@ end
                         }):Play()
                     end
                 })
+
+                configRegistry[msName] = {
+                    type = "multiselect",
+                    get = function() return selectedDict end,
+                    set = function(newDict)
+                        if type(newDict) == "table" then
+                            selectedDict = newDict
+                            updateDisplay(selectedDict)
+                            pcall(callback, selectedDict)
+                        end
+                    end
+                }
 
                 return {
                     Set = function(self, key, state)
@@ -5087,6 +5764,20 @@ end
 
                 refreshAllChips()
 
+                configRegistry[hsTitle] = {
+                    type = "hitbox",
+                    get = function() return activeParts end,
+                    set = function(newParts)
+                        if type(newParts) == "table" then
+                            for k, v in pairs(newParts) do
+                                if activeParts[k] ~= nil then activeParts[k] = (v == true) end
+                            end
+                            refreshAllChips()
+                            pcall(callback, activeParts)
+                        end
+                    end
+                }
+
                 return {
                     Set = function(self, partKey, state)
                         if activeParts[partKey] ~= nil then
@@ -5348,6 +6039,21 @@ end
                         }):Play()
                     end
                 })
+
+                configRegistry[graphName] = {
+                    type = "graph",
+                    get = function() return points end,
+                    set = function(newPoints)
+                        if type(newPoints) == "table" and #newPoints == #points then
+                            for i, p in ipairs(newPoints) do
+                                points[i][1] = math.clamp(p[1], 0, 1)
+                                points[i][2] = math.clamp(p[2], minY, maxY)
+                            end
+                            renderGraph()
+                            pcall(callback, points)
+                        end
+                    end
+                }
 
                 return {
                     Set = function(self, newPoints)
