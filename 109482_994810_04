@@ -5778,7 +5778,7 @@ end
                 Overlay.ZIndex = 28
                 Overlay.Parent = Viewport
 
-                -- 2D Box: Positioned to the left (0.44) and scaled to snugly fit the character from head to toes (58 x 192)
+                -- 2D Box: Positioned to the left (0.44) and scaled to naturally fit the character silhouette (78 x 178)
                 local BoxFrame = Instance.new("Frame")
                 BoxFrame.Name = "PreviewBox"
                 BoxFrame.Active = false
@@ -5786,33 +5786,34 @@ end
                 BoxFrame.BorderSizePixel = 0
                 BoxFrame.AnchorPoint = Vector2.new(0.5, 0.5)
                 BoxFrame.Position = UDim2.new(0.44, 0, 0.50, 0)
-                BoxFrame.Size = UDim2.new(0, 58, 0, 192)
+                BoxFrame.Size = UDim2.new(0, 78, 0, 178)
                 BoxFrame.ZIndex = 29
                 BoxFrame.Parent = Overlay
 
-                local function makeBoxLine(name, size, pos)
+                local function makeBoxLine(name, size, pos, anchor)
                     local l = Instance.new("Frame")
                     l.Name = name
                     l.Active = false
+                    l.AnchorPoint = anchor or Vector2.new(0, 0)
                     l.Size = size
                     l.Position = pos
                     l.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
                     l.BorderSizePixel = 0
-                    l.ZIndex = 30
+                    l.ZIndex = 32
                     l.Parent = BoxFrame
                     return l
                 end
 
-                local boxTop = makeBoxLine("Top", UDim2.new(1, 0, 0, 1), UDim2.new(0, 0, 0, 0))
-                local boxBottom = makeBoxLine("Bottom", UDim2.new(1, 0, 0, 1), UDim2.new(0, 0, 1, -1))
-                local boxLeft = makeBoxLine("Left", UDim2.new(0, 1, 1, 0), UDim2.new(0, 0, 0, 0))
-                local boxRight = makeBoxLine("Right", UDim2.new(0, 1, 1, 0), UDim2.new(1, -1, 0, 0))
+                local boxTop = makeBoxLine("Top", UDim2.new(1, 0, 0, 2), UDim2.new(0, 0, 0, 0), Vector2.new(0, 0))
+                local boxBottom = makeBoxLine("Bottom", UDim2.new(1, 0, 0, 2), UDim2.new(0, 0, 1, 0), Vector2.new(0, 1))
+                local boxLeft = makeBoxLine("Left", UDim2.new(0, 2, 1, 0), UDim2.new(0, 0, 0, 0), Vector2.new(0, 0))
+                local boxRight = makeBoxLine("Right", UDim2.new(0, 2, 1, 0), UDim2.new(1, 0, 0, 0), Vector2.new(1, 0))
                 local boxLines = {boxTop, boxBottom, boxLeft, boxRight}
 
                 local boxStroke = Instance.new("UIStroke")
                 boxStroke.Thickness = 1
                 boxStroke.Color = Color3.fromRGB(0, 0, 0)
-                boxStroke.Transparency = 0.25
+                boxStroke.Transparency = 0.5
                 boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 boxStroke.Parent = BoxFrame
 
@@ -5897,7 +5898,7 @@ end
                         BoxFrame.Size = UDim2.new(0, 140, 0, 56)
                     else
                         BoxFrame.Position = UDim2.new(0.44, 0, 0.50, 0)
-                        BoxFrame.Size = UDim2.new(0, 58, 0, 192)
+                        BoxFrame.Size = UDim2.new(0, 78, 0, 178)
                     end
 
                     -- Чем дальше игрок, тем выше имя и тем ниже дистанция
