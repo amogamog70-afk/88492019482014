@@ -5746,8 +5746,8 @@ end
 
                 -- Camera setup: Shifted target right (+0.38) in world space, rendering the model noticeably to the LEFT on screen!
                 local lookTarget = Vector3.new(0.38, 0, 0)
-                -- camDist: scaled up to 2.08 so the model is smaller, elegant and fits with plenty of space
-                local camDist = modelHeight * 2.08
+                -- camDist: scaled up to 2.75 so the model is smaller, elegant, placed further into the distance with plenty of breathing room
+                local camDist = modelHeight * 2.75
                 local frontPose = CFrame.Angles(0, math.pi, 0)
 
                 -- Initialize all parts to front-facing pose
@@ -5778,15 +5778,15 @@ end
                 Overlay.ZIndex = 28
                 Overlay.Parent = Viewport
 
-                -- 2D Box: Positioned to the left (0.44) and proportionally scaled to the smaller model (84 x 148)
+                -- 2D Box: Positioned to the left (0.44) and scaled to snugly fit the character from head to toes (58 x 192)
                 local BoxFrame = Instance.new("Frame")
                 BoxFrame.Name = "PreviewBox"
                 BoxFrame.Active = false
                 BoxFrame.BackgroundTransparency = 1
                 BoxFrame.BorderSizePixel = 0
                 BoxFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-                BoxFrame.Position = UDim2.new(0.44, 0, 0.48, 0)
-                BoxFrame.Size = UDim2.new(0, 84, 0, 148)
+                BoxFrame.Position = UDim2.new(0.44, 0, 0.50, 0)
+                BoxFrame.Size = UDim2.new(0, 58, 0, 192)
                 BoxFrame.ZIndex = 29
                 BoxFrame.Parent = Overlay
 
@@ -5816,13 +5816,13 @@ end
                 boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 boxStroke.Parent = BoxFrame
 
-                -- Top Label: Attached to top edge of BoxFrame (strictly above head)
+                -- Top Label: Attached to top edge of BoxFrame (strictly above head, no face overlap)
                 local TopLabel = Instance.new("TextLabel")
                 TopLabel.Name = "PreviewTopLabel"
                 TopLabel.Active = false
                 TopLabel.BackgroundTransparency = 1
                 TopLabel.AnchorPoint = Vector2.new(0.5, 1)
-                TopLabel.Position = UDim2.new(0.5, 0, 0, -5)
+                TopLabel.Position = UDim2.new(0.5, 0, 0, -18)
                 TopLabel.Size = UDim2.new(0, 140, 0, 14)
                 TopLabel.Font = Enum.Font.SourceSansBold
                 TopLabel.TextSize = 12
@@ -5833,18 +5833,18 @@ end
                 TopLabel.ZIndex = 31
                 TopLabel.Parent = BoxFrame
 
-                -- Bottom Container: Attached to bottom edge of BoxFrame
+                -- Bottom Container: Attached to bottom edge of BoxFrame (strictly below feet, no leg overlap)
                 local BottomContainer = Instance.new("Frame")
                 BottomContainer.Name = "PreviewBottomContainer"
                 BottomContainer.Active = false
                 BottomContainer.BackgroundTransparency = 1
                 BottomContainer.AnchorPoint = Vector2.new(0.5, 0)
-                BottomContainer.Position = UDim2.new(0.5, 0, 1, 4)
+                BottomContainer.Position = UDim2.new(0.5, 0, 1, 10)
                 BottomContainer.Size = UDim2.new(0, 140, 0, 30)
                 BottomContainer.ZIndex = 31
                 BottomContainer.Parent = BoxFrame
 
-                -- Bottom Weapon Label (immediately below box)
+                -- Bottom Weapon Label (immediately below feet)
                 local WeaponLabel = Instance.new("TextLabel")
                 WeaponLabel.Name = "PreviewWeaponLabel"
                 WeaponLabel.Active = false
@@ -5878,6 +5878,8 @@ end
                 DistLabel.ZIndex = 32
                 DistLabel.Parent = BottomContainer
 
+                local simulatedDist = 42
+
                 -- Pose setup: sets character model parts strictly once on mode change (0 lag during rotation)
                 local function applyPose()
                     if not characterModel or not characterModel.Parent then return end
@@ -5892,11 +5894,17 @@ end
 
                     if isSleeper then
                         BoxFrame.Position = UDim2.new(0.44, 0, 0.58, 0)
-                        BoxFrame.Size = UDim2.new(0, 128, 0, 64)
+                        BoxFrame.Size = UDim2.new(0, 140, 0, 56)
                     else
-                        BoxFrame.Position = UDim2.new(0.44, 0, 0.48, 0)
-                        BoxFrame.Size = UDim2.new(0, 84, 0, 148)
+                        BoxFrame.Position = UDim2.new(0.44, 0, 0.50, 0)
+                        BoxFrame.Size = UDim2.new(0, 58, 0, 192)
                     end
+
+                    -- Чем дальше игрок, тем выше имя и тем ниже дистанция
+                    local topDistOffset = -18 - (simulatedDist * 0.04)
+                    local bottomDistOffset = 10 + (simulatedDist * 0.05)
+                    TopLabel.Position = UDim2.new(0.5, 0, 0, topDistOffset)
+                    BottomContainer.Position = UDim2.new(0.5, 0, 1, bottomDistOffset)
 
                     local hasWeap = (currentSettings.ShowWeapon ~= false)
                     DistLabel.Position = hasWeap and UDim2.new(0.5, 0, 0, 14) or UDim2.new(0.5, 0, 0, 0)
@@ -6046,6 +6054,11 @@ end
                     SetWeapon = function(self, newWeapon)
                         currentWeaponName = newWeapon
                         applySettingsFunc()
+                    end,
+                    SetDistance = function(self, newDist)
+                        simulatedDist = tonumber(newDist) or 42
+                        DistLabel.Text = tostring(math.floor(simulatedDist)) .. "m"
+                        applyPose()
                     end,
                     ResetRotation = function(self)
                         currentYaw = 0
