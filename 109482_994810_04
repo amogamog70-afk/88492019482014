@@ -5485,17 +5485,16 @@ end
                 }
             end
 
-            -- 10. Add ESP Preview (Neverlose-Style 3D Character Viewport with Live ESP Mirroring)
+            -- 10. Add ESP Preview (Clean, Tall 3D Character Viewport with Inertia Rotation and Locked ESP Overlay)
             function Column:AddESPPreview(previewConfig)
                 previewConfig = previewConfig or {}
-                local pTitle = previewConfig.Title or "PREVIEW // TARGET"
-                local pHeight = previewConfig.Height or 265
+                local pHeight = previewConfig.Height or 320
                 local pModelId = tostring(previewConfig.ModelId or "112342985897325")
                 local currentSettings = previewConfig.Settings or {}
                 local targetType = previewConfig.TargetType or "Player"
                 local currentWeaponName = previewConfig.WeaponName or "AK-47"
-                local isAutoRotating = previewConfig.AutoRotate == true
-                local currentYaw = 0.25
+                local currentYaw = 0
+                local targetYaw = 0
 
                 local Row = Instance.new("Frame")
                 Row.Name = "ESPPreviewRow"
@@ -5517,178 +5516,21 @@ end
                 RowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 RowStroke.Parent = Row
 
-                -- Top Header Bar
-                local HeaderBar = Instance.new("Frame")
-                HeaderBar.Name = "HeaderBar"
-                HeaderBar.Active = false
-                HeaderBar.Size = UDim2.new(1, 0, 0, 24)
-                HeaderBar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-                HeaderBar.BorderSizePixel = 0
-                HeaderBar.ZIndex = 25
-                HeaderBar.Parent = Row
-
-                local HeaderBottomBorder = Instance.new("Frame")
-                HeaderBottomBorder.Name = "BottomBorder"
-                HeaderBottomBorder.Active = false
-                HeaderBottomBorder.Size = UDim2.new(1, 0, 0, 1)
-                HeaderBottomBorder.Position = UDim2.new(0, 0, 1, -1)
-                HeaderBottomBorder.BackgroundColor3 = Color3.fromRGB(36, 38, 46)
-                HeaderBottomBorder.BorderSizePixel = 0
-                HeaderBottomBorder.ZIndex = 26
-                HeaderBottomBorder.Parent = HeaderBar
-
-                local TitleLabel = Instance.new("TextLabel")
-                TitleLabel.Name = "TitleLabel"
-                TitleLabel.Active = false
-                TitleLabel.Size = UDim2.new(0, 120, 1, 0)
-                TitleLabel.Position = UDim2.new(0, 8, 0, 0)
-                TitleLabel.BackgroundTransparency = 1
-                TitleLabel.Font = ThemeFontBold
-                TitleLabel.Text = pTitle
-                TitleLabel.TextSize = 10
-                TitleLabel.TextColor3 = Color3.fromRGB(160, 165, 180)
-                TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-                TitleLabel.ZIndex = 27
-                TitleLabel.Parent = HeaderBar
-
-                -- Top Switcher Controls (Auto-Rotate & Target Type)
-                local SwitcherFrame = Instance.new("Frame")
-                SwitcherFrame.Name = "SwitcherFrame"
-                SwitcherFrame.Active = false
-                SwitcherFrame.Size = UDim2.new(1, -130, 1, 0)
-                SwitcherFrame.Position = UDim2.new(0, 124, 0, 0)
-                SwitcherFrame.BackgroundTransparency = 1
-                SwitcherFrame.ZIndex = 27
-                SwitcherFrame.Parent = HeaderBar
-
-                local SwitcherLayout = Instance.new("UIListLayout")
-                SwitcherLayout.FillDirection = Enum.FillDirection.Horizontal
-                SwitcherLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-                SwitcherLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-                SwitcherLayout.SortOrder = Enum.SortOrder.LayoutOrder
-                SwitcherLayout.Padding = UDim.new(0, 4)
-                SwitcherLayout.Parent = SwitcherFrame
-
-                local typeButtons = {}
-
-                local function makeHeaderButton(name, labelText, width, onClick)
-                    local btn = Instance.new("Frame")
-                    btn.Name = "HBtn_" .. name
-                    btn.Active = false
-                    btn.Size = UDim2.new(0, width, 0, 18)
-                    btn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
-                    btn.BorderSizePixel = 0
-                    btn.ZIndex = 28
-                    btn.Parent = SwitcherFrame
-
-                    local corner = Instance.new("UICorner")
-                    corner.CornerRadius = UDim.new(0, 3)
-                    corner.Parent = btn
-
-                    local stroke = Instance.new("UIStroke")
-                    stroke.Thickness = 1
-                    stroke.Color = Color3.fromRGB(42, 46, 56)
-                    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-                    stroke.Parent = btn
-
-                    local text = Instance.new("TextLabel")
-                    text.Name = "Text"
-                    text.Active = false
-                    text.Size = UDim2.new(1, 0, 1, 0)
-                    text.BackgroundTransparency = 1
-                    text.Font = ThemeFontBold
-                    text.Text = labelText
-                    text.TextSize = 9
-                    text.TextColor3 = Color3.fromRGB(160, 165, 180)
-                    text.ZIndex = 29
-                    text.Parent = btn
-
-                    table.insert(clickableRegistry, {
-                        object = btn,
-                        onClick = onClick,
-                        onHover = function(isHov)
-                            if btn:GetAttribute("Active") ~= true then
-                                TweenService:Create(stroke, TweenInfo.new(0.15), {
-                                    Color = isHov and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(42, 46, 56)
-                                }):Play()
-                            end
-                        end
-                    })
-
-                    return {frame = btn, stroke = stroke, text = text}
-                end
-
-                -- Auto Rotate Toggle Button
-                local setAutoRotate = nil
-                local rotateBtn = makeHeaderButton("Rotate", isAutoRotating and "360° ON" or "360°", 42, function()
-                    if setAutoRotate then
-                        setAutoRotate(not isAutoRotating)
-                    else
-                        isAutoRotating = not isAutoRotating
-                    end
-                end)
-                if isAutoRotating then
-                    rotateBtn.text.TextColor3 = Color3.fromRGB(230, 57, 70)
-                end
-
-                -- Target Type Buttons: Player, NPC, Sleeper
-                local function updateTypeButtons()
-                    for tName, tObj in pairs(typeButtons) do
-                        local isCur = (tName == targetType)
-                        tObj.frame:SetAttribute("Active", isCur)
-                        tObj.frame.BackgroundColor3 = isCur and Color3.fromRGB(36, 26, 30) or Color3.fromRGB(24, 24, 28)
-                        tObj.stroke.Color = isCur and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(42, 46, 56)
-                        tObj.text.TextColor3 = isCur and Color3.fromRGB(250, 250, 255) or Color3.fromRGB(140, 145, 160)
-                    end
-                end
-
-                local applySettingsFunc = nil
-                local function setType(newType)
-                    targetType = newType
-                    updateTypeButtons()
-                    if applySettingsFunc then applySettingsFunc() end
-                end
-
-                typeButtons["Player"] = makeHeaderButton("Player", "Player", 40, function() setType("Player") end)
-                typeButtons["NPC"] = makeHeaderButton("NPC", "NPC", 32, function() setType("NPC") end)
-                typeButtons["Sleeper"] = makeHeaderButton("Sleeper", "Sleeper", 44, function() setType("Sleeper") end)
-                updateTypeButtons()
-
-                -- Subtle Floor Pedestal
-                local Pedestal = Instance.new("Frame")
-                Pedestal.Name = "Pedestal"
-                Pedestal.Active = false
-                Pedestal.Size = UDim2.new(0, 96, 0, 14)
-                Pedestal.Position = UDim2.new(0.5, -48, 1, -22)
-                Pedestal.BackgroundColor3 = Color3.fromRGB(22, 24, 28)
-                Pedestal.BorderSizePixel = 0
-                Pedestal.ZIndex = 25
-                Pedestal.Parent = Row
-
-                local PedestalCorner = Instance.new("UICorner")
-                PedestalCorner.CornerRadius = UDim.new(1, 0)
-                PedestalCorner.Parent = Pedestal
-
-                local PedestalStroke = Instance.new("UIStroke")
-                PedestalStroke.Thickness = 1
-                PedestalStroke.Color = Color3.fromRGB(38, 42, 52)
-                PedestalStroke.Parent = Pedestal
-
-                -- 3D Viewport Frame (Pure GPU mesh rendering, no WorldModel physics simulation)
+                -- 3D Viewport Frame (Edge-to-edge pure 3D canvas, no header bar, no pedestal)
                 local Viewport = Instance.new("ViewportFrame")
                 Viewport.Name = "ModelViewport"
                 Viewport.Active = false
-                Viewport.Size = UDim2.new(1, 0, 1, -24)
-                Viewport.Position = UDim2.new(0, 0, 0, 24)
+                Viewport.Size = UDim2.new(1, 0, 1, 0)
+                Viewport.Position = UDim2.new(0, 0, 0, 0)
                 Viewport.BackgroundTransparency = 1
                 Viewport.ZIndex = 25
-                Viewport.Ambient = Color3.fromRGB(190, 190, 205)
+                Viewport.Ambient = Color3.fromRGB(195, 195, 210)
                 Viewport.LightColor = Color3.fromRGB(255, 255, 255)
                 Viewport.LightDirection = Vector3.new(-1, -1.8, -1.2)
                 Viewport.Parent = Row
 
                 local Camera = Instance.new("Camera")
-                Camera.FieldOfView = 36
+                Camera.FieldOfView = 34
                 Viewport.CurrentCamera = Camera
                 Camera.Parent = Viewport
 
@@ -5845,13 +5687,10 @@ end
                 end
 
                 -- Camera setup: positioned at (0, 0, camDist) looking directly at (0, 0, 0)
-                local camDist = modelHeight * 1.54
+                local camDist = modelHeight * 1.46
                 Camera.CFrame = CFrame.lookAt(Vector3.new(0, 0, camDist), Vector3.new(0, 0, 0))
 
-                -- currentYaw: 0 means standing still facing directly at the player/camera
-                local currentYaw = 0
-
-                -- ESP Overlay Elements (Overlaid 2D Box and Text Labels)
+                -- ESP Overlay Elements: Physically bound to the exact center of the 3D model
                 local Overlay = Instance.new("Frame")
                 Overlay.Name = "ESPOverlay"
                 Overlay.Active = false
@@ -5860,12 +5699,15 @@ end
                 Overlay.ZIndex = 28
                 Overlay.Parent = Viewport
 
-                -- 2D Box
+                -- 2D Box: Locked strictly to the center of the viewport surrounding the 3D character
                 local BoxFrame = Instance.new("Frame")
                 BoxFrame.Name = "PreviewBox"
                 BoxFrame.Active = false
                 BoxFrame.BackgroundTransparency = 1
                 BoxFrame.BorderSizePixel = 0
+                BoxFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+                BoxFrame.Position = UDim2.new(0.5, 0, 0.48, 0)
+                BoxFrame.Size = UDim2.new(0, 114, 0, 206)
                 BoxFrame.ZIndex = 29
                 BoxFrame.Parent = Overlay
 
@@ -5891,104 +5733,98 @@ end
                 local boxStroke = Instance.new("UIStroke")
                 boxStroke.Thickness = 1
                 boxStroke.Color = Color3.fromRGB(0, 0, 0)
-                boxStroke.Transparency = 0.2
+                boxStroke.Transparency = 0.25
                 boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 boxStroke.Parent = BoxFrame
 
-                -- Top Label
+                -- Top Label: Attached to top edge of BoxFrame (strictly above head)
                 local TopLabel = Instance.new("TextLabel")
                 TopLabel.Name = "PreviewTopLabel"
                 TopLabel.Active = false
-                TopLabel.Size = UDim2.new(0, 140, 0, 14)
                 TopLabel.BackgroundTransparency = 1
+                TopLabel.AnchorPoint = Vector2.new(0.5, 1)
+                TopLabel.Position = UDim2.new(0.5, 0, 0, -5)
+                TopLabel.Size = UDim2.new(0, 140, 0, 14)
                 TopLabel.Font = Enum.Font.SourceSansBold
-                TopLabel.TextSize = 13
+                TopLabel.TextSize = 12
                 TopLabel.Text = "Player"
                 TopLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
                 TopLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
                 TopLabel.TextStrokeTransparency = 0
                 TopLabel.ZIndex = 31
-                TopLabel.Parent = Overlay
+                TopLabel.Parent = BoxFrame
 
-                -- Bottom Distance Label
-                local DistLabel = Instance.new("TextLabel")
-                DistLabel.Name = "PreviewDistLabel"
-                DistLabel.Active = false
-                DistLabel.Size = UDim2.new(0, 140, 0, 13)
-                DistLabel.BackgroundTransparency = 1
-                DistLabel.Font = Enum.Font.SourceSansBold
-                DistLabel.TextSize = 12
-                DistLabel.Text = "42m"
-                DistLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-                DistLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-                DistLabel.TextStrokeTransparency = 0
-                DistLabel.ZIndex = 31
-                DistLabel.Parent = Overlay
+                -- Bottom Container: Attached to bottom edge of BoxFrame
+                local BottomContainer = Instance.new("Frame")
+                BottomContainer.Name = "PreviewBottomContainer"
+                BottomContainer.Active = false
+                BottomContainer.BackgroundTransparency = 1
+                BottomContainer.AnchorPoint = Vector2.new(0.5, 0)
+                BottomContainer.Position = UDim2.new(0.5, 0, 1, 4)
+                BottomContainer.Size = UDim2.new(0, 140, 0, 30)
+                BottomContainer.ZIndex = 31
+                BottomContainer.Parent = BoxFrame
 
-                -- Bottom Weapon Label
+                -- Bottom Weapon Label (immediately below box)
                 local WeaponLabel = Instance.new("TextLabel")
                 WeaponLabel.Name = "PreviewWeaponLabel"
                 WeaponLabel.Active = false
-                WeaponLabel.Size = UDim2.new(0, 140, 0, 13)
                 WeaponLabel.BackgroundTransparency = 1
+                WeaponLabel.AnchorPoint = Vector2.new(0.5, 0)
+                WeaponLabel.Position = UDim2.new(0.5, 0, 0, 0)
+                WeaponLabel.Size = UDim2.new(1, 0, 0, 13)
                 WeaponLabel.Font = Enum.Font.SourceSansBold
-                WeaponLabel.TextSize = 12
+                WeaponLabel.TextSize = 11
                 WeaponLabel.Text = currentWeaponName
                 WeaponLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
                 WeaponLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
                 WeaponLabel.TextStrokeTransparency = 0
-                WeaponLabel.ZIndex = 31
-                WeaponLabel.Parent = Overlay
+                WeaponLabel.ZIndex = 32
+                WeaponLabel.Parent = BottomContainer
 
-                -- Zero-drift stationary projection calculation (0% lag, 0 PivotTo)
+                -- Bottom Distance Label (strictly LOWER, below weapon)
+                local DistLabel = Instance.new("TextLabel")
+                DistLabel.Name = "PreviewDistLabel"
+                DistLabel.Active = false
+                DistLabel.BackgroundTransparency = 1
+                DistLabel.AnchorPoint = Vector2.new(0.5, 0)
+                DistLabel.Position = UDim2.new(0.5, 0, 0, 14)
+                DistLabel.Size = UDim2.new(1, 0, 0, 13)
+                DistLabel.Font = Enum.Font.SourceSansBold
+                DistLabel.TextSize = 11
+                DistLabel.Text = "42m"
+                DistLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                DistLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                DistLabel.TextStrokeTransparency = 0
+                DistLabel.ZIndex = 32
+                DistLabel.Parent = BottomContainer
+
+                -- Projection update: Applies exact stationary CFrame and box bounds
                 local function updateProjection()
                     if not characterModel or not characterModel.Parent then return end
 
-                    -- Zero-drift stationary pose centered at (0, 0, 0) facing camera
                     local isSleeper = (targetType == "Sleeper")
                     local poseCFrame = CFrame.Angles(0, math.pi + currentYaw, 0)
                     if isSleeper then
                         poseCFrame = CFrame.new(0, -modelHeight * 0.22, 0) * CFrame.Angles(math.rad(-90), math.pi + currentYaw, 0)
+                        BoxFrame.Position = UDim2.new(0.5, 0, 0.62, 0)
+                        BoxFrame.Size = UDim2.new(0, 175, 0, 82)
+                    else
+                        BoxFrame.Position = UDim2.new(0.5, 0, 0.48, 0)
+                        BoxFrame.Size = UDim2.new(0, 114, 0, 206)
                     end
 
-                    -- Apply exact immutable offsets to all parts (0 drift, 0 PivotTo, 0 lag)
                     for _, entry in ipairs(localPartOffsets) do
                         if entry.part and entry.part.Parent then
                             entry.part.CFrame = poseCFrame * entry.offset
                         end
                     end
 
-                    -- 2D Box projection (remains stationary as model turns)
-                    local topPt = Camera:WorldToViewportPoint(Vector3.new(0, modelHeight * 0.48, 0))
-                    local btmPt = Camera:WorldToViewportPoint(Vector3.new(0, -modelHeight * 0.48, 0))
-                    local boxH = math.abs(btmPt.Y - topPt.Y)
-                    local boxW = boxH * 0.54
-
-                    if isSleeper then
-                        boxW = boxH * 1.32
-                        boxH = boxH * 0.56
-                        topPt = Camera:WorldToViewportPoint(Vector3.new(0, -modelHeight * 0.04, 0))
-                        btmPt = Camera:WorldToViewportPoint(Vector3.new(0, -modelHeight * 0.44, 0))
-                    end
-
-                    local viewSize = Viewport.AbsoluteSize
-                    local cx = (viewSize.X > 0 and viewSize.X or 240) * 0.5
-                    local cy = (topPt.Y + btmPt.Y) * 0.5
-                    local boxX = cx - boxW * 0.5
-                    local boxY = cy - boxH * 0.5
-
-                    BoxFrame.Position = UDim2.new(0, math.floor(boxX), 0, math.floor(boxY))
-                    BoxFrame.Size = UDim2.new(0, math.floor(boxW), 0, math.floor(boxH))
-
-                    TopLabel.Position = UDim2.new(0, math.floor(cx - 70), 0, math.floor(boxY - 18))
-
                     local hasWeap = (currentSettings.ShowWeapon ~= false)
-                    local hasDist = (currentSettings.ShowDistance ~= false)
-                    WeaponLabel.Position = UDim2.new(0, math.floor(cx - 70), 0, math.floor(boxY + boxH + 3))
-                    DistLabel.Position = UDim2.new(0, math.floor(cx - 70), 0, math.floor(boxY + boxH + (hasWeap and 17 or 3)))
+                    DistLabel.Position = hasWeap and UDim2.new(0.5, 0, 0, 14) or UDim2.new(0.5, 0, 0, 0)
                 end
 
-                applySettingsFunc = function(s)
+                local applySettingsFunc = function(s)
                     if s then currentSettings = s end
                     local masterEnabled = (currentSettings.Enabled ~= false)
 
@@ -6030,13 +5866,13 @@ end
 
                 applySettingsFunc()
 
-                -- Drag Interaction on Viewport (Zero-GPE, rotation ONLY around Y axis, position permanently locked)
+                -- Drag Interaction on Viewport (Ultra-smooth 144Hz Inertia Damping)
                 local Hitbox = Instance.new("Frame")
                 Hitbox.Name = "PreviewHitbox"
                 Hitbox.Active = false
                 Hitbox.Size = UDim2.new(1, 0, 1, 0)
                 Hitbox.BackgroundTransparency = 1
-                Hitbox.ZIndex = 32
+                Hitbox.ZIndex = 33
                 Hitbox.Parent = Viewport
 
                 local hintLabel = Instance.new("TextLabel")
@@ -6046,27 +5882,58 @@ end
                 hintLabel.Position = UDim2.new(0, 0, 1, -16)
                 hintLabel.BackgroundTransparency = 1
                 hintLabel.Font = ThemeFont
-                hintLabel.Text = "DRAG HORIZONTALLY TO ROTATE"
+                hintLabel.Text = "DRAG TO ROTATE"
                 hintLabel.TextSize = 9
-                hintLabel.TextColor3 = Color3.fromRGB(80, 85, 100)
+                hintLabel.TextColor3 = Color3.fromRGB(70, 75, 90)
                 hintLabel.TextXAlignment = Enum.TextXAlignment.Center
                 hintLabel.ZIndex = 26
                 hintLabel.Parent = Row
+
+                local smoothConn = nil
+                local function ensureSmoothLoop()
+                    if smoothConn then return end
+                    smoothConn = RunService.RenderStepped:Connect(function(dt)
+                        if not Row.Parent or not Row.Visible or not MainFrame.Visible then
+                            if smoothConn then
+                                smoothConn:Disconnect()
+                                smoothConn = nil
+                            end
+                            return
+                        end
+
+                        local diff = targetYaw - currentYaw
+                        if math.abs(diff) > 0.0002 or activePreviewDrag then
+                            local alpha = math.clamp(1 - math.exp(-22 * dt), 0, 1)
+                            currentYaw = currentYaw + diff * alpha
+                            updateProjection()
+                        else
+                            currentYaw = targetYaw
+                            updateProjection()
+                            if smoothConn and not activePreviewDrag then
+                                smoothConn:Disconnect()
+                                smoothConn = nil
+                            end
+                        end
+                    end)
+                end
 
                 table.insert(clickableRegistry, {
                     object = Hitbox,
                     onClick = function(clickX)
                         activePreviewDrag = {
                             startX = clickX,
-                            startAngle = currentYaw,
+                            startTargetYaw = targetYaw,
                             update = function(mx)
                                 local dx = mx - activePreviewDrag.startX
-                                currentYaw = (activePreviewDrag.startAngle - dx * 0.012) % (math.pi * 2)
-                                updateProjection()
+                                targetYaw = activePreviewDrag.startTargetYaw - dx * 0.011
+                                ensureSmoothLoop()
                                 if hintLabel.Visible then hintLabel.Visible = false end
                             end,
-                            finish = function() end
+                            finish = function()
+                                ensureSmoothLoop()
+                            end
                         }
+                        ensureSmoothLoop()
                     end,
                     onHover = function(isHov)
                         TweenService:Create(RowStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
@@ -6075,33 +5942,6 @@ end
                     end
                 })
 
-                -- Auto-rotation turntable: ONLY connects if explicitly toggled on (0% background lag)
-                local autoRotateConn = nil
-                setAutoRotate = function(enabled)
-                    isAutoRotating = (enabled == true)
-                    if autoRotateConn then
-                        autoRotateConn:Disconnect()
-                        autoRotateConn = nil
-                    end
-                    if isAutoRotating then
-                        autoRotateConn = RunService.RenderStepped:Connect(function(dt)
-                            if not Row.Parent or not Row.Visible or not MainFrame.Visible then return end
-                            if not activePreviewDrag then
-                                currentYaw = (currentYaw + dt * 0.8) % (math.pi * 2)
-                                updateProjection()
-                            end
-                        end)
-                    end
-                    if rotateBtn then
-                        rotateBtn.text.Text = isAutoRotating and "360° ON" or "360°"
-                        rotateBtn.text.TextColor3 = isAutoRotating and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(160, 165, 180)
-                    end
-                end
-
-                if isAutoRotating then
-                    setAutoRotate(true)
-                end
-
                 return {
                     Row = Row,
                     Viewport = Viewport,
@@ -6109,17 +5949,16 @@ end
                         applySettingsFunc(newSettings)
                     end,
                     SetTargetType = function(self, newType)
-                        setType(newType)
+                        targetType = newType
+                        applySettingsFunc()
                     end,
                     SetWeapon = function(self, newWeapon)
                         currentWeaponName = newWeapon
                         applySettingsFunc()
                     end,
-                    SetAutoRotate = function(self, enabled)
-                        setAutoRotate(enabled)
-                    end,
                     ResetRotation = function(self)
                         currentYaw = 0
+                        targetYaw = 0
                         updateProjection()
                     end
                 }
