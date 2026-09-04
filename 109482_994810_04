@@ -5918,7 +5918,7 @@ end
                 DistLabel.BackgroundTransparency = 1
                 DistLabel.Font = Enum.Font.SourceSansBold
                 DistLabel.TextSize = 12
-                DistLabel.Text = "42"
+                DistLabel.Text = "42m"
                 DistLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
                 DistLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
                 DistLabel.TextStrokeTransparency = 0
@@ -5980,11 +5980,12 @@ end
                     BoxFrame.Position = UDim2.new(0, math.floor(boxX), 0, math.floor(boxY))
                     BoxFrame.Size = UDim2.new(0, math.floor(boxW), 0, math.floor(boxH))
 
-                    TopLabel.Position = UDim2.new(0, math.floor(cx - 70), 0, math.floor(boxY - 17))
+                    TopLabel.Position = UDim2.new(0, math.floor(cx - 70), 0, math.floor(boxY - 18))
 
+                    local hasWeap = (currentSettings.ShowWeapon ~= false)
                     local hasDist = (currentSettings.ShowDistance ~= false)
-                    DistLabel.Position = UDim2.new(0, math.floor(cx - 70), 0, math.floor(boxY + boxH + 2))
-                    WeaponLabel.Position = UDim2.new(0, math.floor(cx - 70), 0, math.floor(boxY + boxH + (hasDist and 16 or 2)))
+                    WeaponLabel.Position = UDim2.new(0, math.floor(cx - 70), 0, math.floor(boxY + boxH + 3))
+                    DistLabel.Position = UDim2.new(0, math.floor(cx - 70), 0, math.floor(boxY + boxH + (hasWeap and 17 or 3)))
                 end
 
                 applySettingsFunc = function(s)
