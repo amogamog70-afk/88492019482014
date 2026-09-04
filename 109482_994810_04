@@ -1539,6 +1539,7 @@ end
 -- Interactive Zero-GPE Component Variables
 local activeSlider = nil
 local activeGraphDrag = nil
+local activePreviewDrag = nil
 local activeContextItem = nil
 local isListeningKeybind = false
 
@@ -2978,6 +2979,11 @@ UserInputService.InputChanged:Connect(function(input)
             return
         end
 
+        if activePreviewDrag then
+            activePreviewDrag.update(mx, my)
+            return
+        end
+
         local anyInteractiveHovered = false
 
         -- Neverlose-style dynamic smooth hover reactions (Zero-GPE)
@@ -3159,6 +3165,10 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
         if activeGraphDrag then
             activeGraphDrag.finish()
             activeGraphDrag = nil
+        end
+        if activePreviewDrag then
+            activePreviewDrag.finish()
+            activePreviewDrag = nil
         end
         if ColorPicker and ColorPicker.EndDrag then
             pcall(ColorPicker.EndDrag)
@@ -5471,6 +5481,578 @@ end
                     end,
                     Get = function(self)
                         return points
+                    end
+                }
+            end
+
+            -- 10. Add ESP Preview (Neverlose-Style 3D Character Viewport with Live ESP Mirroring)
+            function Column:AddESPPreview(previewConfig)
+                previewConfig = previewConfig or {}
+                local pTitle = previewConfig.Title or "PREVIEW // TARGET"
+                local pHeight = previewConfig.Height or 265
+                local pModelId = tostring(previewConfig.ModelId or "112342985897325")
+                local currentSettings = previewConfig.Settings or {}
+                local targetType = previewConfig.TargetType or "Player"
+                local currentWeaponName = previewConfig.WeaponName or "AK-47"
+                local isAutoRotating = previewConfig.AutoRotate == true
+                local currentYaw = 0.25
+
+                local Row = Instance.new("Frame")
+                Row.Name = "ESPPreviewRow"
+                Row.Active = false
+                Row.Size = UDim2.new(1, 0, 0, pHeight)
+                Row.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+                Row.BorderSizePixel = 0
+                Row.ClipsDescendants = true
+                Row.ZIndex = 24
+                Row.Parent = ColContent
+
+                local RowCorner = Instance.new("UICorner")
+                RowCorner.CornerRadius = UDim.new(0, 4)
+                RowCorner.Parent = Row
+
+                local RowStroke = Instance.new("UIStroke")
+                RowStroke.Thickness = 1
+                RowStroke.Color = Color3.fromRGB(44, 46, 56)
+                RowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                RowStroke.Parent = Row
+
+                -- Top Header Bar
+                local HeaderBar = Instance.new("Frame")
+                HeaderBar.Name = "HeaderBar"
+                HeaderBar.Active = false
+                HeaderBar.Size = UDim2.new(1, 0, 0, 24)
+                HeaderBar.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+                HeaderBar.BorderSizePixel = 0
+                HeaderBar.ZIndex = 25
+                HeaderBar.Parent = Row
+
+                local HeaderBottomBorder = Instance.new("Frame")
+                HeaderBottomBorder.Name = "BottomBorder"
+                HeaderBottomBorder.Active = false
+                HeaderBottomBorder.Size = UDim2.new(1, 0, 0, 1)
+                HeaderBottomBorder.Position = UDim2.new(0, 0, 1, -1)
+                HeaderBottomBorder.BackgroundColor3 = Color3.fromRGB(36, 38, 46)
+                HeaderBottomBorder.BorderSizePixel = 0
+                HeaderBottomBorder.ZIndex = 26
+                HeaderBottomBorder.Parent = HeaderBar
+
+                local TitleLabel = Instance.new("TextLabel")
+                TitleLabel.Name = "TitleLabel"
+                TitleLabel.Active = false
+                TitleLabel.Size = UDim2.new(0, 120, 1, 0)
+                TitleLabel.Position = UDim2.new(0, 8, 0, 0)
+                TitleLabel.BackgroundTransparency = 1
+                TitleLabel.Font = ThemeFontBold
+                TitleLabel.Text = pTitle
+                TitleLabel.TextSize = 10
+                TitleLabel.TextColor3 = Color3.fromRGB(160, 165, 180)
+                TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+                TitleLabel.ZIndex = 27
+                TitleLabel.Parent = HeaderBar
+
+                -- Top Switcher Controls (Auto-Rotate & Target Type)
+                local SwitcherFrame = Instance.new("Frame")
+                SwitcherFrame.Name = "SwitcherFrame"
+                SwitcherFrame.Active = false
+                SwitcherFrame.Size = UDim2.new(1, -130, 1, 0)
+                SwitcherFrame.Position = UDim2.new(0, 124, 0, 0)
+                SwitcherFrame.BackgroundTransparency = 1
+                SwitcherFrame.ZIndex = 27
+                SwitcherFrame.Parent = HeaderBar
+
+                local SwitcherLayout = Instance.new("UIListLayout")
+                SwitcherLayout.FillDirection = Enum.FillDirection.Horizontal
+                SwitcherLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+                SwitcherLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+                SwitcherLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                SwitcherLayout.Padding = UDim.new(0, 4)
+                SwitcherLayout.Parent = SwitcherFrame
+
+                local typeButtons = {}
+
+                local function makeHeaderButton(name, labelText, width, onClick)
+                    local btn = Instance.new("Frame")
+                    btn.Name = "HBtn_" .. name
+                    btn.Active = false
+                    btn.Size = UDim2.new(0, width, 0, 18)
+                    btn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+                    btn.BorderSizePixel = 0
+                    btn.ZIndex = 28
+                    btn.Parent = SwitcherFrame
+
+                    local corner = Instance.new("UICorner")
+                    corner.CornerRadius = UDim.new(0, 3)
+                    corner.Parent = btn
+
+                    local stroke = Instance.new("UIStroke")
+                    stroke.Thickness = 1
+                    stroke.Color = Color3.fromRGB(42, 46, 56)
+                    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                    stroke.Parent = btn
+
+                    local text = Instance.new("TextLabel")
+                    text.Name = "Text"
+                    text.Active = false
+                    text.Size = UDim2.new(1, 0, 1, 0)
+                    text.BackgroundTransparency = 1
+                    text.Font = ThemeFontBold
+                    text.Text = labelText
+                    text.TextSize = 9
+                    text.TextColor3 = Color3.fromRGB(160, 165, 180)
+                    text.ZIndex = 29
+                    text.Parent = btn
+
+                    table.insert(clickableRegistry, {
+                        object = btn,
+                        onClick = onClick,
+                        onHover = function(isHov)
+                            if btn:GetAttribute("Active") ~= true then
+                                TweenService:Create(stroke, TweenInfo.new(0.15), {
+                                    Color = isHov and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(42, 46, 56)
+                                }):Play()
+                            end
+                        end
+                    })
+
+                    return {frame = btn, stroke = stroke, text = text}
+                end
+
+                -- Auto Rotate Toggle Button
+                local rotateBtn = makeHeaderButton("Rotate", isAutoRotating and "360° ON" or "360°", 42, function()
+                    isAutoRotating = not isAutoRotating
+                    rotateBtn.text.Text = isAutoRotating and "360° ON" or "360°"
+                    rotateBtn.text.TextColor3 = isAutoRotating and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(160, 165, 180)
+                end)
+                if isAutoRotating then
+                    rotateBtn.text.TextColor3 = Color3.fromRGB(230, 57, 70)
+                end
+
+                -- Target Type Buttons: Player, NPC, Sleeper
+                local function updateTypeButtons()
+                    for tName, tObj in pairs(typeButtons) do
+                        local isCur = (tName == targetType)
+                        tObj.frame:SetAttribute("Active", isCur)
+                        tObj.frame.BackgroundColor3 = isCur and Color3.fromRGB(36, 26, 30) or Color3.fromRGB(24, 24, 28)
+                        tObj.stroke.Color = isCur and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(42, 46, 56)
+                        tObj.text.TextColor3 = isCur and Color3.fromRGB(250, 250, 255) or Color3.fromRGB(140, 145, 160)
+                    end
+                end
+
+                local applySettingsFunc = nil
+                local function setType(newType)
+                    targetType = newType
+                    updateTypeButtons()
+                    if applySettingsFunc then applySettingsFunc() end
+                end
+
+                typeButtons["Player"] = makeHeaderButton("Player", "Player", 40, function() setType("Player") end)
+                typeButtons["NPC"] = makeHeaderButton("NPC", "NPC", 32, function() setType("NPC") end)
+                typeButtons["Sleeper"] = makeHeaderButton("Sleeper", "Sleeper", 44, function() setType("Sleeper") end)
+                updateTypeButtons()
+
+                -- Subtle Floor Pedestal
+                local Pedestal = Instance.new("Frame")
+                Pedestal.Name = "Pedestal"
+                Pedestal.Active = false
+                Pedestal.Size = UDim2.new(0, 96, 0, 14)
+                Pedestal.Position = UDim2.new(0.5, -48, 1, -22)
+                Pedestal.BackgroundColor3 = Color3.fromRGB(22, 24, 28)
+                Pedestal.BorderSizePixel = 0
+                Pedestal.ZIndex = 25
+                Pedestal.Parent = Row
+
+                local PedestalCorner = Instance.new("UICorner")
+                PedestalCorner.CornerRadius = UDim.new(1, 0)
+                PedestalCorner.Parent = Pedestal
+
+                local PedestalStroke = Instance.new("UIStroke")
+                PedestalStroke.Thickness = 1
+                PedestalStroke.Color = Color3.fromRGB(38, 42, 52)
+                PedestalStroke.Parent = Pedestal
+
+                -- 3D Viewport Frame
+                local Viewport = Instance.new("ViewportFrame")
+                Viewport.Name = "ModelViewport"
+                Viewport.Active = false
+                Viewport.Size = UDim2.new(1, 0, 1, -24)
+                Viewport.Position = UDim2.new(0, 0, 0, 24)
+                Viewport.BackgroundTransparency = 1
+                Viewport.ZIndex = 25
+                Viewport.Ambient = Color3.fromRGB(170, 170, 185)
+                Viewport.LightColor = Color3.fromRGB(255, 255, 255)
+                Viewport.LightDirection = Vector3.new(-1, -1.8, -1.2)
+                Viewport.Parent = Row
+
+                local WorldModel = Instance.new("WorldModel")
+                WorldModel.Parent = Viewport
+
+                local Camera = Instance.new("Camera")
+                Camera.FieldOfView = 40
+                Viewport.CurrentCamera = Camera
+                Camera.Parent = Viewport
+
+                -- Character Model Loader with Fallback Rig
+                local characterModel = nil
+
+                local function createFallbackDummy()
+                    local dummy = Instance.new("Model")
+                    dummy.Name = "PreviewDummy"
+
+                    local function makePart(name, size, pos, color)
+                        local p = Instance.new("Part")
+                        p.Name = name
+                        p.Size = size
+                        p.CFrame = CFrame.new(pos)
+                        p.Color = color or Color3.fromRGB(65, 70, 80)
+                        p.Material = Enum.Material.SmoothPlastic
+                        p.Anchored = true
+                        p.CanCollide = false
+                        p.Parent = dummy
+                        return p
+                    end
+
+                    local root = makePart("HumanoidRootPart", Vector3.new(2, 2, 1), Vector3.new(0, 3, 0), Color3.fromRGB(40, 42, 50))
+                    root.Transparency = 1
+                    dummy.PrimaryPart = root
+
+                    makePart("Torso", Vector3.new(2, 2, 1), Vector3.new(0, 3, 0), Color3.fromRGB(45, 48, 56))
+                    makePart("Head", Vector3.new(1.2, 1.2, 1.2), Vector3.new(0, 4.6, 0), Color3.fromRGB(220, 185, 155))
+                    makePart("Left Arm", Vector3.new(1, 2, 1), Vector3.new(-1.5, 3, 0), Color3.fromRGB(50, 54, 64))
+                    makePart("Right Arm", Vector3.new(1, 2, 1), Vector3.new(1.5, 3, 0), Color3.fromRGB(50, 54, 64))
+                    makePart("Left Leg", Vector3.new(1, 2, 1), Vector3.new(-0.5, 1, 0), Color3.fromRGB(35, 38, 44))
+                    makePart("Right Leg", Vector3.new(1, 2, 1), Vector3.new(0.5, 1, 0), Color3.fromRGB(35, 38, 44))
+
+                    local handModel = Instance.new("Model")
+                    handModel.Name = "HandModel"
+                    local gun = makePart("AK-47", Vector3.new(0.3, 0.7, 2.2), Vector3.new(1.5, 2.6, -0.6), Color3.fromRGB(24, 24, 26))
+                    gun.Parent = handModel
+                    handModel.Parent = dummy
+
+                    return dummy
+                end
+
+                local function loadRig()
+                    local mod = nil
+                    pcall(function()
+                        if game.GetObjects then
+                            local objs = game:GetObjects("rbxassetid://" .. pModelId)
+                            if objs and #objs > 0 then
+                                for _, obj in ipairs(objs) do
+                                    if obj:IsA("Model") then
+                                        mod = obj
+                                        break
+                                    elseif obj:IsA("BasePart") then
+                                        mod = Instance.new("Model")
+                                        obj.Parent = mod
+                                        break
+                                    end
+                                end
+                                if not mod then
+                                    mod = Instance.new("Model")
+                                    for _, obj in ipairs(objs) do
+                                        obj.Parent = mod
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    if not mod then
+                        pcall(function()
+                            local ins = game:GetService("InsertService")
+                            local asset = ins:LoadAsset(tonumber(pModelId))
+                            if asset then
+                                mod = asset:FindFirstChildWhichIsA("Model") or asset
+                            end
+                        end)
+                    end
+                    if not mod or #mod:GetChildren() == 0 then
+                        mod = createFallbackDummy()
+                    end
+                    return mod
+                end
+
+                characterModel = loadRig()
+                characterModel.Parent = WorldModel
+
+                for _, part in ipairs(characterModel:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.Anchored = true
+                        part.CanCollide = false
+                        part.CanTouch = false
+                        part.CanQuery = false
+                    end
+                end
+
+                local primaryPart = characterModel.PrimaryPart or characterModel:FindFirstChild("HumanoidRootPart") or characterModel:FindFirstChild("Torso") or characterModel:FindFirstChild("Head") or characterModel:FindFirstChildWhichIsA("BasePart")
+                if not primaryPart then
+                    primaryPart = Instance.new("Part")
+                    primaryPart.Name = "HumanoidRootPart"
+                    primaryPart.Size = Vector3.new(2, 2, 1)
+                    primaryPart.Transparency = 1
+                    primaryPart.Anchored = true
+                    primaryPart.Parent = characterModel
+                    characterModel.PrimaryPart = primaryPart
+                end
+
+                local _, sz = characterModel:GetBoundingBox()
+                local modelHeight = math.max(sz.Y, 5.0)
+                local targetCenter = Vector3.new(0, modelHeight * 0.5, 0)
+                characterModel:PivotTo(CFrame.new(targetCenter))
+
+                local camDist = modelHeight * 1.62
+                local camPos = Vector3.new(0, modelHeight * 0.5, camDist)
+                Camera.CFrame = CFrame.lookAt(camPos, targetCenter)
+
+                -- ESP Overlay Elements (Overlaid 2D Box and Text Labels)
+                local Overlay = Instance.new("Frame")
+                Overlay.Name = "ESPOverlay"
+                Overlay.Active = false
+                Overlay.Size = UDim2.new(1, 0, 1, 0)
+                Overlay.BackgroundTransparency = 1
+                Overlay.ZIndex = 28
+                Overlay.Parent = Viewport
+
+                -- 2D Box
+                local BoxFrame = Instance.new("Frame")
+                BoxFrame.Name = "PreviewBox"
+                BoxFrame.Active = false
+                BoxFrame.BackgroundTransparency = 1
+                BoxFrame.BorderSizePixel = 0
+                BoxFrame.ZIndex = 29
+                BoxFrame.Parent = Overlay
+
+                local function makeBoxLine(name, size, pos)
+                    local l = Instance.new("Frame")
+                    l.Name = name
+                    l.Active = false
+                    l.Size = size
+                    l.Position = pos
+                    l.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                    l.BorderSizePixel = 0
+                    l.ZIndex = 30
+                    l.Parent = BoxFrame
+                    return l
+                end
+
+                local boxTop = makeBoxLine("Top", UDim2.new(1, 0, 0, 1), UDim2.new(0, 0, 0, 0))
+                local boxBottom = makeBoxLine("Bottom", UDim2.new(1, 0, 0, 1), UDim2.new(0, 0, 1, -1))
+                local boxLeft = makeBoxLine("Left", UDim2.new(0, 1, 1, 0), UDim2.new(0, 0, 0, 0))
+                local boxRight = makeBoxLine("Right", UDim2.new(0, 1, 1, 0), UDim2.new(1, -1, 0, 0))
+                local boxLines = {boxTop, boxBottom, boxLeft, boxRight}
+
+                local boxStroke = Instance.new("UIStroke")
+                boxStroke.Thickness = 1
+                boxStroke.Color = Color3.fromRGB(0, 0, 0)
+                boxStroke.Transparency = 0.2
+                boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                boxStroke.Parent = BoxFrame
+
+                -- Top Label
+                local TopLabel = Instance.new("TextLabel")
+                TopLabel.Name = "PreviewTopLabel"
+                TopLabel.Active = false
+                TopLabel.Size = UDim2.new(0, 140, 0, 14)
+                TopLabel.BackgroundTransparency = 1
+                TopLabel.Font = Enum.Font.SourceSansBold
+                TopLabel.TextSize = 13
+                TopLabel.Text = "Player"
+                TopLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                TopLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                TopLabel.TextStrokeTransparency = 0
+                TopLabel.ZIndex = 31
+                TopLabel.Parent = Overlay
+
+                -- Bottom Distance Label
+                local DistLabel = Instance.new("TextLabel")
+                DistLabel.Name = "PreviewDistLabel"
+                DistLabel.Active = false
+                DistLabel.Size = UDim2.new(0, 140, 0, 13)
+                DistLabel.BackgroundTransparency = 1
+                DistLabel.Font = Enum.Font.SourceSansBold
+                DistLabel.TextSize = 12
+                DistLabel.Text = "42"
+                DistLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                DistLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                DistLabel.TextStrokeTransparency = 0
+                DistLabel.ZIndex = 31
+                DistLabel.Parent = Overlay
+
+                -- Bottom Weapon Label
+                local WeaponLabel = Instance.new("TextLabel")
+                WeaponLabel.Name = "PreviewWeaponLabel"
+                WeaponLabel.Active = false
+                WeaponLabel.Size = UDim2.new(0, 140, 0, 13)
+                WeaponLabel.BackgroundTransparency = 1
+                WeaponLabel.Font = Enum.Font.SourceSansBold
+                WeaponLabel.TextSize = 12
+                WeaponLabel.Text = currentWeaponName
+                WeaponLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                WeaponLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                WeaponLabel.TextStrokeTransparency = 0
+                WeaponLabel.ZIndex = 31
+                WeaponLabel.Parent = Overlay
+
+                -- Projection Calculation
+                local function updateProjection()
+                    if not characterModel or not characterModel.Parent then return end
+
+                    local poseCFrame = CFrame.new(targetCenter) * CFrame.Angles(0, currentYaw, 0)
+                    if targetType == "Sleeper" then
+                        poseCFrame = CFrame.new(0, 0.75, 0) * CFrame.Angles(math.rad(-90), currentYaw, 0)
+                    end
+                    characterModel:PivotTo(poseCFrame)
+
+                    local cf = characterModel:GetPivot()
+                    local topPoint, btmPoint, leftPoint, rightPoint
+
+                    if targetType == "Sleeper" then
+                        topPoint = Camera:WorldToViewportPoint(cf.Position + Vector3.new(0, 1.2, 0))
+                        btmPoint = Camera:WorldToViewportPoint(cf.Position - Vector3.new(0, 0.6, 0))
+                        leftPoint = Camera:WorldToViewportPoint(cf.Position - cf.LookVector * 2.4)
+                        rightPoint = Camera:WorldToViewportPoint(cf.Position + cf.LookVector * 2.4)
+                    else
+                        topPoint = Camera:WorldToViewportPoint(cf.Position + Vector3.new(0, modelHeight * 0.52, 0))
+                        btmPoint = Camera:WorldToViewportPoint(cf.Position - Vector3.new(0, modelHeight * 0.48, 0))
+                        leftPoint = Camera:WorldToViewportPoint(cf.Position - Vector3.new(1.8, 0, 0))
+                        rightPoint = Camera:WorldToViewportPoint(cf.Position + Vector3.new(1.8, 0, 0))
+                    end
+
+                    local minX = math.min(topPoint.X, btmPoint.X, leftPoint.X, rightPoint.X)
+                    local maxX = math.max(topPoint.X, btmPoint.X, leftPoint.X, rightPoint.X)
+                    local minY = math.min(topPoint.Y, btmPoint.Y, leftPoint.Y, rightPoint.Y)
+                    local maxY = math.max(topPoint.Y, btmPoint.Y, leftPoint.Y, rightPoint.Y)
+
+                    local boxW = math.clamp(maxX - minX, 32, 220)
+                    local boxH = math.clamp(maxY - minY, 40, 240)
+                    local boxX = (minX + maxX) * 0.5 - boxW * 0.5
+                    local boxY = (minY + maxY) * 0.5 - boxH * 0.5
+
+                    BoxFrame.Position = UDim2.new(0, math.floor(boxX), 0, math.floor(boxY))
+                    BoxFrame.Size = UDim2.new(0, math.floor(boxW), 0, math.floor(boxH))
+
+                    TopLabel.Position = UDim2.new(0, math.floor(boxX + boxW * 0.5 - 70), 0, math.floor(boxY - 17))
+
+                    local hasDist = (currentSettings.ShowDistance ~= false)
+                    DistLabel.Position = UDim2.new(0, math.floor(boxX + boxW * 0.5 - 70), 0, math.floor(boxY + boxH + 2))
+                    WeaponLabel.Position = UDim2.new(0, math.floor(boxX + boxW * 0.5 - 70), 0, math.floor(boxY + boxH + (hasDist and 16 or 2)))
+                end
+
+                applySettingsFunc = function(s)
+                    if s then currentSettings = s end
+                    local masterEnabled = (currentSettings.Enabled ~= false)
+
+                    -- 1. 2D Box
+                    local showBox = masterEnabled and (currentSettings.ShowBox ~= false)
+                    BoxFrame.Visible = showBox
+                    local bColor = currentSettings.BoxColor or Color3.fromRGB(255, 255, 255)
+                    for _, line in ipairs(boxLines) do
+                        line.BackgroundColor3 = bColor
+                    end
+
+                    -- 2. Entity Color
+                    local entColor = currentSettings.TypeColor or Color3.fromRGB(255, 255, 255)
+                    if targetType == "NPC" and currentSettings.NPCColor then
+                        entColor = currentSettings.NPCColor
+                    elseif targetType == "Sleeper" and currentSettings.SleeperColor then
+                        entColor = currentSettings.SleeperColor
+                    end
+
+                    -- 3. Top Label
+                    local showType = masterEnabled and (currentSettings.ShowType ~= false)
+                    TopLabel.Visible = showType
+                    TopLabel.Text = targetType
+                    TopLabel.TextColor3 = entColor
+
+                    -- 4. Distance Label
+                    local showDist = masterEnabled and (currentSettings.ShowDistance ~= false)
+                    DistLabel.Visible = showDist
+                    DistLabel.TextColor3 = currentSettings.DistanceColor or Color3.fromRGB(255, 255, 255)
+
+                    -- 5. Weapon Label
+                    local showWeapon = masterEnabled and (currentSettings.ShowWeapon ~= false)
+                    WeaponLabel.Visible = showWeapon
+                    WeaponLabel.Text = currentWeaponName
+                    WeaponLabel.TextColor3 = currentSettings.WeaponColor or Color3.fromRGB(255, 255, 255)
+
+                    updateProjection()
+                end
+
+                applySettingsFunc()
+
+                -- Drag Interaction on Viewport (Zero-GPE)
+                local Hitbox = Instance.new("Frame")
+                Hitbox.Name = "PreviewHitbox"
+                Hitbox.Active = false
+                Hitbox.Size = UDim2.new(1, 0, 1, 0)
+                Hitbox.BackgroundTransparency = 1
+                Hitbox.ZIndex = 32
+                Hitbox.Parent = Viewport
+
+                local hintLabel = Instance.new("TextLabel")
+                hintLabel.Name = "HintLabel"
+                hintLabel.Active = false
+                hintLabel.Size = UDim2.new(1, 0, 0, 14)
+                hintLabel.Position = UDim2.new(0, 0, 1, -16)
+                hintLabel.BackgroundTransparency = 1
+                hintLabel.Font = ThemeFont
+                hintLabel.Text = "HOLD & DRAG TO ROTATE"
+                hintLabel.TextSize = 9
+                hintLabel.TextColor3 = Color3.fromRGB(80, 85, 100)
+                hintLabel.TextXAlignment = Enum.TextXAlignment.Center
+                hintLabel.ZIndex = 26
+                hintLabel.Parent = Row
+
+                table.insert(clickableRegistry, {
+                    object = Hitbox,
+                    onClick = function(clickX)
+                        activePreviewDrag = {
+                            startX = clickX,
+                            startAngle = currentYaw,
+                            update = function(mx)
+                                local dx = mx - activePreviewDrag.startX
+                                currentYaw = activePreviewDrag.startAngle + (dx * 0.014)
+                                updateProjection()
+                                if hintLabel.Visible then hintLabel.Visible = false end
+                            end,
+                            finish = function() end
+                        }
+                    end,
+                    onHover = function(isHov)
+                        TweenService:Create(RowStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            Color = isHov and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
+                        }):Play()
+                    end
+                })
+
+                -- Auto-rotation turntable loop
+                RunService.RenderStepped:Connect(function(dt)
+                    if not Row.Parent or not Row.Visible then return end
+                    if isAutoRotating and (not activePreviewDrag) then
+                        currentYaw = (currentYaw + dt * 0.7) % (math.pi * 2)
+                        updateProjection()
+                    end
+                end)
+
+                return {
+                    Update = function(self, newSettings)
+                        applySettingsFunc(newSettings)
+                    end,
+                    SetTargetType = function(self, newType)
+                        setType(newType)
+                    end,
+                    SetWeapon = function(self, newWeapon)
+                        currentWeaponName = newWeapon
+                        applySettingsFunc()
+                    end,
+                    SetAutoRotate = function(self, enabled)
+                        isAutoRotating = (enabled == true)
+                        rotateBtn.text.Text = isAutoRotating and "360° ON" or "360°"
+                        rotateBtn.text.TextColor3 = isAutoRotating and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(160, 165, 180)
+                    end,
+                    ResetRotation = function(self)
+                        currentYaw = 0.25
+                        updateProjection()
                     end
                 }
             end
