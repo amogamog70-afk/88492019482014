@@ -5895,7 +5895,7 @@ end
 
                     if isSleeper then
                         BoxFrame.Position = UDim2.new(0.44, 0, 0.58, 0)
-                        BoxFrame.Size = UDim2.new(0, 140, 0, 56)
+                        BoxFrame.Size = UDim2.new(0, 78, 0, 48)
                     else
                         BoxFrame.Position = UDim2.new(0.44, 0, 0.50, 0)
                         BoxFrame.Size = UDim2.new(0, 78, 0, 178)
