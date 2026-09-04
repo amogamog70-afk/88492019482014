@@ -5619,10 +5619,13 @@ end
                 end
 
                 -- Auto Rotate Toggle Button
+                local setAutoRotate = nil
                 local rotateBtn = makeHeaderButton("Rotate", isAutoRotating and "360° ON" or "360°", 42, function()
-                    isAutoRotating = not isAutoRotating
-                    rotateBtn.text.Text = isAutoRotating and "360° ON" or "360°"
-                    rotateBtn.text.TextColor3 = isAutoRotating and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(160, 165, 180)
+                    if setAutoRotate then
+                        setAutoRotate(not isAutoRotating)
+                    else
+                        isAutoRotating = not isAutoRotating
+                    end
                 end)
                 if isAutoRotating then
                     rotateBtn.text.TextColor3 = Color3.fromRGB(230, 57, 70)
@@ -5671,7 +5674,7 @@ end
                 PedestalStroke.Color = Color3.fromRGB(38, 42, 52)
                 PedestalStroke.Parent = Pedestal
 
-                -- 3D Viewport Frame
+                -- 3D Viewport Frame (Pure GPU mesh rendering, no WorldModel physics simulation)
                 local Viewport = Instance.new("ViewportFrame")
                 Viewport.Name = "ModelViewport"
                 Viewport.Active = false
@@ -5679,22 +5682,17 @@ end
                 Viewport.Position = UDim2.new(0, 0, 0, 24)
                 Viewport.BackgroundTransparency = 1
                 Viewport.ZIndex = 25
-                Viewport.Ambient = Color3.fromRGB(170, 170, 185)
+                Viewport.Ambient = Color3.fromRGB(190, 190, 205)
                 Viewport.LightColor = Color3.fromRGB(255, 255, 255)
                 Viewport.LightDirection = Vector3.new(-1, -1.8, -1.2)
                 Viewport.Parent = Row
 
-                local WorldModel = Instance.new("WorldModel")
-                WorldModel.Parent = Viewport
-
                 local Camera = Instance.new("Camera")
-                Camera.FieldOfView = 40
+                Camera.FieldOfView = 36
                 Viewport.CurrentCamera = Camera
                 Camera.Parent = Viewport
 
                 -- Character Model Loader with Fallback Rig
-                local characterModel = nil
-
                 local function createFallbackDummy()
                     local dummy = Instance.new("Model")
                     dummy.Name = "PreviewDummy"
@@ -5772,37 +5770,86 @@ end
                     return mod
                 end
 
-                characterModel = loadRig()
-                characterModel.Parent = WorldModel
+                -- Parent model directly to Viewport (NO WorldModel = ZERO physics / zero lag)
+                local characterModel = loadRig()
+                characterModel.Parent = Viewport
 
+                -- Strip any scripts, body movers, sounds, constraints to eliminate lag
+                for _, inst in ipairs(characterModel:GetDescendants()) do
+                    if inst:IsA("LuaSourceContainer") or inst:IsA("BodyMover") or inst:IsA("Constraint") or inst:IsA("Sound") then
+                        inst:Destroy()
+                    end
+                end
+
+                -- Neuter Humanoid if present (zero CPU, disables physics states and displays)
+                local humanoid = characterModel:FindFirstChildWhichIsA("Humanoid")
+                if humanoid then
+                    humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+                    humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+                    humanoid.RequiresNeck = false
+                    humanoid.PlatformStand = true
+                    humanoid.AutoRotate = false
+                    humanoid.WalkSpeed = 0
+                    humanoid.JumpPower = 0
+                    humanoid.JumpHeight = 0
+                    for _, state in ipairs(Enum.HumanoidStateType:GetEnumItems()) do
+                        if state ~= Enum.HumanoidStateType.None then
+                            pcall(function() humanoid:SetStateEnabled(state, false) end)
+                        end
+                    end
+                    pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.None) end)
+                end
+
+                -- Find reference torso/root part for the central rotation axis (spine)
+                local rootPart = characterModel:FindFirstChild("HumanoidRootPart")
+                    or characterModel:FindFirstChild("Torso")
+                    or characterModel:FindFirstChild("UpperTorso")
+                    or characterModel.PrimaryPart
+                    or characterModel:FindFirstChildWhichIsA("BasePart")
+
+                -- Bounding box for height and vertical centering
+                local initialCF, initialSize = characterModel:GetBoundingBox()
+                local modelHeight = math.max(initialSize.Y, 5)
+
+                -- The central rotation axis: horizontal center from rootPart (spine), vertical center from bounding box
+                local rootPos = rootPart and rootPart.Position or initialCF.Position
+                local centerPos = Vector3.new(rootPos.X, initialCF.Position.Y, rootPos.Z)
+
+                -- Determine forward facing yaw of the model
+                local refYaw = 0
+                if rootPart then
+                    local _, ry, _ = rootPart.CFrame:ToOrientation()
+                    refYaw = ry
+                else
+                    local _, ry, _ = initialCF:ToOrientation()
+                    refYaw = ry
+                end
+
+                -- Base coordinate frame centered at the character's spine and facing forward
+                local baseFrame = CFrame.new(centerPos) * CFrame.Angles(0, refYaw, 0)
+
+                -- Precompute immutable local offset for every BasePart relative to baseFrame (0 drift, 0 PivotTo)
+                local localPartOffsets = {}
                 for _, part in ipairs(characterModel:GetDescendants()) do
                     if part:IsA("BasePart") then
+                        table.insert(localPartOffsets, {
+                            part = part,
+                            offset = baseFrame:ToObjectSpace(part.CFrame)
+                        })
                         part.Anchored = true
                         part.CanCollide = false
                         part.CanTouch = false
                         part.CanQuery = false
+                        part.CastShadow = false
                     end
                 end
 
-                local primaryPart = characterModel.PrimaryPart or characterModel:FindFirstChild("HumanoidRootPart") or characterModel:FindFirstChild("Torso") or characterModel:FindFirstChild("Head") or characterModel:FindFirstChildWhichIsA("BasePart")
-                if not primaryPart then
-                    primaryPart = Instance.new("Part")
-                    primaryPart.Name = "HumanoidRootPart"
-                    primaryPart.Size = Vector3.new(2, 2, 1)
-                    primaryPart.Transparency = 1
-                    primaryPart.Anchored = true
-                    primaryPart.Parent = characterModel
-                    characterModel.PrimaryPart = primaryPart
-                end
+                -- Camera setup: positioned at (0, 0, camDist) looking directly at (0, 0, 0)
+                local camDist = modelHeight * 1.54
+                Camera.CFrame = CFrame.lookAt(Vector3.new(0, 0, camDist), Vector3.new(0, 0, 0))
 
-                local _, sz = characterModel:GetBoundingBox()
-                local modelHeight = math.max(sz.Y, 5.0)
-                local targetCenter = Vector3.new(0, modelHeight * 0.5, 0)
-                characterModel:PivotTo(CFrame.new(targetCenter))
-
-                local camDist = modelHeight * 1.62
-                local camPos = Vector3.new(0, modelHeight * 0.5, camDist)
-                Camera.CFrame = CFrame.lookAt(camPos, targetCenter)
+                -- currentYaw: 0 means standing still facing directly at the player/camera
+                local currentYaw = 0
 
                 -- ESP Overlay Elements (Overlaid 2D Box and Text Labels)
                 local Overlay = Instance.new("Frame")
@@ -5893,49 +5940,51 @@ end
                 WeaponLabel.ZIndex = 31
                 WeaponLabel.Parent = Overlay
 
-                -- Projection Calculation
+                -- Zero-drift stationary projection calculation (0% lag, 0 PivotTo)
                 local function updateProjection()
                     if not characterModel or not characterModel.Parent then return end
 
-                    local poseCFrame = CFrame.new(targetCenter) * CFrame.Angles(0, currentYaw, 0)
-                    if targetType == "Sleeper" then
-                        poseCFrame = CFrame.new(0, 0.75, 0) * CFrame.Angles(math.rad(-90), currentYaw, 0)
-                    end
-                    characterModel:PivotTo(poseCFrame)
-
-                    local cf = characterModel:GetPivot()
-                    local topPoint, btmPoint, leftPoint, rightPoint
-
-                    if targetType == "Sleeper" then
-                        topPoint = Camera:WorldToViewportPoint(cf.Position + Vector3.new(0, 1.2, 0))
-                        btmPoint = Camera:WorldToViewportPoint(cf.Position - Vector3.new(0, 0.6, 0))
-                        leftPoint = Camera:WorldToViewportPoint(cf.Position - cf.LookVector * 2.4)
-                        rightPoint = Camera:WorldToViewportPoint(cf.Position + cf.LookVector * 2.4)
-                    else
-                        topPoint = Camera:WorldToViewportPoint(cf.Position + Vector3.new(0, modelHeight * 0.52, 0))
-                        btmPoint = Camera:WorldToViewportPoint(cf.Position - Vector3.new(0, modelHeight * 0.48, 0))
-                        leftPoint = Camera:WorldToViewportPoint(cf.Position - Vector3.new(1.8, 0, 0))
-                        rightPoint = Camera:WorldToViewportPoint(cf.Position + Vector3.new(1.8, 0, 0))
+                    -- Zero-drift stationary pose centered at (0, 0, 0) facing camera
+                    local isSleeper = (targetType == "Sleeper")
+                    local poseCFrame = CFrame.Angles(0, math.pi + currentYaw, 0)
+                    if isSleeper then
+                        poseCFrame = CFrame.new(0, -modelHeight * 0.22, 0) * CFrame.Angles(math.rad(-90), math.pi + currentYaw, 0)
                     end
 
-                    local minX = math.min(topPoint.X, btmPoint.X, leftPoint.X, rightPoint.X)
-                    local maxX = math.max(topPoint.X, btmPoint.X, leftPoint.X, rightPoint.X)
-                    local minY = math.min(topPoint.Y, btmPoint.Y, leftPoint.Y, rightPoint.Y)
-                    local maxY = math.max(topPoint.Y, btmPoint.Y, leftPoint.Y, rightPoint.Y)
+                    -- Apply exact immutable offsets to all parts (0 drift, 0 PivotTo, 0 lag)
+                    for _, entry in ipairs(localPartOffsets) do
+                        if entry.part and entry.part.Parent then
+                            entry.part.CFrame = poseCFrame * entry.offset
+                        end
+                    end
 
-                    local boxW = math.clamp(maxX - minX, 32, 220)
-                    local boxH = math.clamp(maxY - minY, 40, 240)
-                    local boxX = (minX + maxX) * 0.5 - boxW * 0.5
-                    local boxY = (minY + maxY) * 0.5 - boxH * 0.5
+                    -- 2D Box projection (remains stationary as model turns)
+                    local topPt = Camera:WorldToViewportPoint(Vector3.new(0, modelHeight * 0.48, 0))
+                    local btmPt = Camera:WorldToViewportPoint(Vector3.new(0, -modelHeight * 0.48, 0))
+                    local boxH = math.abs(btmPt.Y - topPt.Y)
+                    local boxW = boxH * 0.54
+
+                    if isSleeper then
+                        boxW = boxH * 1.32
+                        boxH = boxH * 0.56
+                        topPt = Camera:WorldToViewportPoint(Vector3.new(0, -modelHeight * 0.04, 0))
+                        btmPt = Camera:WorldToViewportPoint(Vector3.new(0, -modelHeight * 0.44, 0))
+                    end
+
+                    local viewSize = Viewport.AbsoluteSize
+                    local cx = (viewSize.X > 0 and viewSize.X or 240) * 0.5
+                    local cy = (topPt.Y + btmPt.Y) * 0.5
+                    local boxX = cx - boxW * 0.5
+                    local boxY = cy - boxH * 0.5
 
                     BoxFrame.Position = UDim2.new(0, math.floor(boxX), 0, math.floor(boxY))
                     BoxFrame.Size = UDim2.new(0, math.floor(boxW), 0, math.floor(boxH))
 
-                    TopLabel.Position = UDim2.new(0, math.floor(boxX + boxW * 0.5 - 70), 0, math.floor(boxY - 17))
+                    TopLabel.Position = UDim2.new(0, math.floor(cx - 70), 0, math.floor(boxY - 17))
 
                     local hasDist = (currentSettings.ShowDistance ~= false)
-                    DistLabel.Position = UDim2.new(0, math.floor(boxX + boxW * 0.5 - 70), 0, math.floor(boxY + boxH + 2))
-                    WeaponLabel.Position = UDim2.new(0, math.floor(boxX + boxW * 0.5 - 70), 0, math.floor(boxY + boxH + (hasDist and 16 or 2)))
+                    DistLabel.Position = UDim2.new(0, math.floor(cx - 70), 0, math.floor(boxY + boxH + 2))
+                    WeaponLabel.Position = UDim2.new(0, math.floor(cx - 70), 0, math.floor(boxY + boxH + (hasDist and 16 or 2)))
                 end
 
                 applySettingsFunc = function(s)
@@ -5980,7 +6029,7 @@ end
 
                 applySettingsFunc()
 
-                -- Drag Interaction on Viewport (Zero-GPE)
+                -- Drag Interaction on Viewport (Zero-GPE, rotation ONLY around Y axis, position permanently locked)
                 local Hitbox = Instance.new("Frame")
                 Hitbox.Name = "PreviewHitbox"
                 Hitbox.Active = false
@@ -5996,7 +6045,7 @@ end
                 hintLabel.Position = UDim2.new(0, 0, 1, -16)
                 hintLabel.BackgroundTransparency = 1
                 hintLabel.Font = ThemeFont
-                hintLabel.Text = "HOLD & DRAG TO ROTATE"
+                hintLabel.Text = "DRAG HORIZONTALLY TO ROTATE"
                 hintLabel.TextSize = 9
                 hintLabel.TextColor3 = Color3.fromRGB(80, 85, 100)
                 hintLabel.TextXAlignment = Enum.TextXAlignment.Center
@@ -6011,7 +6060,7 @@ end
                             startAngle = currentYaw,
                             update = function(mx)
                                 local dx = mx - activePreviewDrag.startX
-                                currentYaw = activePreviewDrag.startAngle + (dx * 0.014)
+                                currentYaw = (activePreviewDrag.startAngle - dx * 0.012) % (math.pi * 2)
                                 updateProjection()
                                 if hintLabel.Visible then hintLabel.Visible = false end
                             end,
@@ -6025,16 +6074,36 @@ end
                     end
                 })
 
-                -- Auto-rotation turntable loop
-                RunService.RenderStepped:Connect(function(dt)
-                    if not Row.Parent or not Row.Visible then return end
-                    if isAutoRotating and (not activePreviewDrag) then
-                        currentYaw = (currentYaw + dt * 0.7) % (math.pi * 2)
-                        updateProjection()
+                -- Auto-rotation turntable: ONLY connects if explicitly toggled on (0% background lag)
+                local autoRotateConn = nil
+                setAutoRotate = function(enabled)
+                    isAutoRotating = (enabled == true)
+                    if autoRotateConn then
+                        autoRotateConn:Disconnect()
+                        autoRotateConn = nil
                     end
-                end)
+                    if isAutoRotating then
+                        autoRotateConn = RunService.RenderStepped:Connect(function(dt)
+                            if not Row.Parent or not Row.Visible or not MainFrame.Visible then return end
+                            if not activePreviewDrag then
+                                currentYaw = (currentYaw + dt * 0.8) % (math.pi * 2)
+                                updateProjection()
+                            end
+                        end)
+                    end
+                    if rotateBtn then
+                        rotateBtn.text.Text = isAutoRotating and "360° ON" or "360°"
+                        rotateBtn.text.TextColor3 = isAutoRotating and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(160, 165, 180)
+                    end
+                end
+
+                if isAutoRotating then
+                    setAutoRotate(true)
+                end
 
                 return {
+                    Row = Row,
+                    Viewport = Viewport,
                     Update = function(self, newSettings)
                         applySettingsFunc(newSettings)
                     end,
@@ -6046,12 +6115,10 @@ end
                         applySettingsFunc()
                     end,
                     SetAutoRotate = function(self, enabled)
-                        isAutoRotating = (enabled == true)
-                        rotateBtn.text.Text = isAutoRotating and "360° ON" or "360°"
-                        rotateBtn.text.TextColor3 = isAutoRotating and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(160, 165, 180)
+                        setAutoRotate(enabled)
                     end,
                     ResetRotation = function(self)
-                        currentYaw = 0.25
+                        currentYaw = 0
                         updateProjection()
                     end
                 }
