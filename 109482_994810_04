@@ -3528,7 +3528,7 @@ end
         LeftScroll.ScrollBarImageColor3 = Color3.fromRGB(55, 60, 75)
         LeftScroll.ScrollBarImageTransparency = 0.2
         LeftScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
-        LeftScroll.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
+        pcall(function() LeftScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
         LeftScroll.ClipsDescendants = true
         LeftScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         LeftScroll.ZIndex = 21
@@ -3539,6 +3539,9 @@ end
         LeftLayout.SortOrder = Enum.SortOrder.LayoutOrder
         LeftLayout.Padding = UDim.new(0, 12)
         LeftLayout.Parent = LeftScroll
+        LeftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            LeftScroll.CanvasSize = UDim2.new(0, 0, 0, LeftLayout.AbsoluteContentSize.Y + 24)
+        end)
 
         local RightScroll = Instance.new("ScrollingFrame")
         RightScroll.Name = "RightScroll"
@@ -3551,7 +3554,7 @@ end
         RightScroll.ScrollBarImageColor3 = Color3.fromRGB(55, 60, 75)
         RightScroll.ScrollBarImageTransparency = 0.2
         RightScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
-        RightScroll.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
+        pcall(function() RightScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
         RightScroll.ClipsDescendants = true
         RightScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         RightScroll.ZIndex = 21
@@ -3562,6 +3565,9 @@ end
         RightLayout.SortOrder = Enum.SortOrder.LayoutOrder
         RightLayout.Padding = UDim.new(0, 12)
         RightLayout.Parent = RightScroll
+        RightLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            RightScroll.CanvasSize = UDim2.new(0, 0, 0, RightLayout.AbsoluteContentSize.Y + 24)
+        end)
 
         local subtabsList = {}
         local subtabsBar = nil
@@ -6154,7 +6160,7 @@ end
             SubLeftScroll.ScrollBarImageColor3 = Color3.fromRGB(55, 60, 75)
             SubLeftScroll.ScrollBarImageTransparency = 0.2
             SubLeftScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
-            SubLeftScroll.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
+            pcall(function() SubLeftScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
             SubLeftScroll.ClipsDescendants = true
             SubLeftScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
             SubLeftScroll.ZIndex = 21
@@ -6165,6 +6171,9 @@ end
             SubLeftLayout.SortOrder = Enum.SortOrder.LayoutOrder
             SubLeftLayout.Padding = UDim.new(0, 12)
             SubLeftLayout.Parent = SubLeftScroll
+            SubLeftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                SubLeftScroll.CanvasSize = UDim2.new(0, 0, 0, SubLeftLayout.AbsoluteContentSize.Y + 24)
+            end)
 
             local SubRightScroll = Instance.new("ScrollingFrame")
             SubRightScroll.Name = "SubRightScroll"
@@ -6177,7 +6186,7 @@ end
             SubRightScroll.ScrollBarImageColor3 = Color3.fromRGB(55, 60, 75)
             SubRightScroll.ScrollBarImageTransparency = 0.2
             SubRightScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
-            SubRightScroll.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
+            pcall(function() SubRightScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
             SubRightScroll.ClipsDescendants = true
             SubRightScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
             SubRightScroll.ZIndex = 21
@@ -6188,6 +6197,9 @@ end
             SubRightLayout.SortOrder = Enum.SortOrder.LayoutOrder
             SubRightLayout.Padding = UDim.new(0, 12)
             SubRightLayout.Parent = SubRightScroll
+            SubRightLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                SubRightScroll.CanvasSize = UDim2.new(0, 0, 0, SubRightLayout.AbsoluteContentSize.Y + 24)
+            end)
 
             local subEntry = {
                 btn = SubBtn,
