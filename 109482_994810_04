@@ -1522,18 +1522,29 @@ end
 
 local function isInside(x, y, obj)
     if not obj or not obj.Visible then return false end
-    -- Check visibility of all ancestors up to ScreenGui (prevents hidden tabs from registering clicks)
+    local pos = obj.AbsolutePosition
+    local size = obj.AbsoluteSize
+    if x < pos.X or x > (pos.X + size.X) or y < pos.Y or y > (pos.Y + size.Y) then
+        return false
+    end
+    -- Check visibility AND clipping bounds of all ancestors up to ScreenGui (prevents hidden/scrolled elements from registering clicks)
     local curr = obj.Parent
     while curr and curr ~= ScreenGui and curr ~= game do
-        if curr:IsA("GuiObject") and not curr.Visible then
-            return false
+        if curr:IsA("GuiObject") then
+            if not curr.Visible then
+                return false
+            end
+            if curr.ClipsDescendants then
+                local cPos = curr.AbsolutePosition
+                local cSize = curr.AbsoluteSize
+                if x < cPos.X or x > (cPos.X + cSize.X) or y < cPos.Y or y > (cPos.Y + cSize.Y) then
+                    return false
+                end
+            end
         end
         curr = curr.Parent
     end
-    local pos = obj.AbsolutePosition
-    local size = obj.AbsoluteSize
-    return x >= pos.X and x <= (pos.X + size.X)
-       and y >= pos.Y and y <= (pos.Y + size.Y)
+    return true
 end
 
 -- Interactive Zero-GPE Component Variables
@@ -3141,16 +3152,20 @@ UserInputService.InputChanged:Connect(function(input)
 
         if activeTab and MainFrame.Visible and menuOpen then
             local scrollSpeed = 40
+            local s = nil
             if activeTab.leftScroll and isInside(mx, my, activeTab.leftScroll) then
-                local s = activeTab.leftScroll
-                local maxScroll = math.max(0, s.CanvasSize.Y.Offset - s.AbsoluteSize.Y)
-                local newY = math.clamp(s.CanvasPosition.Y - (scrollDelta * scrollSpeed), 0, maxScroll)
-                s.CanvasPosition = Vector2.new(0, newY)
+                s = activeTab.leftScroll
             elseif activeTab.rightScroll and isInside(mx, my, activeTab.rightScroll) then
-                local s = activeTab.rightScroll
-                local maxScroll = math.max(0, s.CanvasSize.Y.Offset - s.AbsoluteSize.Y)
-                local newY = math.clamp(s.CanvasPosition.Y - (scrollDelta * scrollSpeed), 0, maxScroll)
-                s.CanvasPosition = Vector2.new(0, newY)
+                s = activeTab.rightScroll
+            end
+
+            if s then
+                local contentHeight = s.AbsoluteCanvasSize.Y > 0 and s.AbsoluteCanvasSize.Y or s.CanvasSize.Y.Offset
+                local maxScroll = math.max(0, contentHeight - s.AbsoluteSize.Y)
+                if maxScroll > 0 then
+                    local newY = math.clamp(s.CanvasPosition.Y - (scrollDelta * scrollSpeed), 0, maxScroll)
+                    s.CanvasPosition = Vector2.new(0, newY)
+                end
             end
         end
     end
@@ -3501,17 +3516,19 @@ end
         TabPage.ZIndex = 20
         TabPage.Parent = ContentArea
 
-        -- Dual Columns Scrolling Containers (Left & Right)
+        -- Dual Columns Scrolling Containers (Left & Right: Mathematically Symmetric 14px grid)
         local LeftScroll = Instance.new("ScrollingFrame")
         LeftScroll.Name = "LeftScroll"
         LeftScroll.Active = false
-        LeftScroll.Size = UDim2.new(0, 326, 1, -24)
-        LeftScroll.Position = UDim2.new(0, 14, 0, 12)
+        LeftScroll.Size = UDim2.new(0, 324, 1, -20)
+        LeftScroll.Position = UDim2.new(0, 14, 0, 10)
         LeftScroll.BackgroundTransparency = 1
         LeftScroll.BorderSizePixel = 0
-        LeftScroll.ScrollBarThickness = 3
-        LeftScroll.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
-        LeftScroll.ScrollBarImageTransparency = 0
+        LeftScroll.ScrollBarThickness = 2
+        LeftScroll.ScrollBarImageColor3 = Color3.fromRGB(55, 60, 75)
+        LeftScroll.ScrollBarImageTransparency = 0.2
+        LeftScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
+        LeftScroll.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
         LeftScroll.ClipsDescendants = true
         LeftScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         LeftScroll.ZIndex = 21
@@ -3523,20 +3540,18 @@ end
         LeftLayout.Padding = UDim.new(0, 12)
         LeftLayout.Parent = LeftScroll
 
-        LeftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            LeftScroll.CanvasSize = UDim2.new(0, 0, 0, LeftLayout.AbsoluteContentSize.Y + 24)
-        end)
-
         local RightScroll = Instance.new("ScrollingFrame")
         RightScroll.Name = "RightScroll"
         RightScroll.Active = false
-        RightScroll.Size = UDim2.new(0, 326, 1, -24)
-        RightScroll.Position = UDim2.new(0, 350, 0, 12)
+        RightScroll.Size = UDim2.new(0, 324, 1, -20)
+        RightScroll.Position = UDim2.new(0, 352, 0, 10)
         RightScroll.BackgroundTransparency = 1
         RightScroll.BorderSizePixel = 0
-        RightScroll.ScrollBarThickness = 3
-        RightScroll.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
-        RightScroll.ScrollBarImageTransparency = 0
+        RightScroll.ScrollBarThickness = 2
+        RightScroll.ScrollBarImageColor3 = Color3.fromRGB(55, 60, 75)
+        RightScroll.ScrollBarImageTransparency = 0.2
+        RightScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
+        RightScroll.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
         RightScroll.ClipsDescendants = true
         RightScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
         RightScroll.ZIndex = 21
@@ -3547,10 +3562,6 @@ end
         RightLayout.SortOrder = Enum.SortOrder.LayoutOrder
         RightLayout.Padding = UDim.new(0, 12)
         RightLayout.Parent = RightScroll
-
-        RightLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            RightScroll.CanvasSize = UDim2.new(0, 0, 0, RightLayout.AbsoluteContentSize.Y + 24)
-        end)
 
         local subtabsList = {}
         local subtabsBar = nil
@@ -3641,8 +3652,8 @@ end
                 subtabsBar = Instance.new("Frame")
                 subtabsBar.Name = "SubtabsBar"
                 subtabsBar.Active = false
-                subtabsBar.Size = UDim2.new(1, -28, 0, 32)
-                subtabsBar.Position = UDim2.new(0, 14, 0, 8)
+                subtabsBar.Size = UDim2.new(1, -28, 0, 28)
+                subtabsBar.Position = UDim2.new(0, 14, 0, 10)
                 subtabsBar.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
                 subtabsBar.BorderSizePixel = 0
                 subtabsBar.ZIndex = 25
@@ -3661,8 +3672,8 @@ end
                 local subBarPadding = Instance.new("UIPadding")
                 subBarPadding.PaddingLeft = UDim.new(0, 4)
                 subBarPadding.PaddingRight = UDim.new(0, 4)
-                subBarPadding.PaddingTop = UDim.new(0, 3)
-                subBarPadding.PaddingBottom = UDim.new(0, 3)
+                subBarPadding.PaddingTop = UDim.new(0, 2)
+                subBarPadding.PaddingBottom = UDim.new(0, 2)
                 subBarPadding.Parent = subtabsBar
 
                 local subLayout = Instance.new("UIListLayout")
@@ -3683,7 +3694,7 @@ end
             local ColCard = Instance.new("Frame")
             ColCard.Name = "Col_" .. colTitle
             ColCard.Active = false
-            ColCard.Size = UDim2.new(1, -6, 0, 0)
+            ColCard.Size = UDim2.new(1, 0, 0, 0)
             ColCard.AutomaticSize = Enum.AutomaticSize.Y
             ColCard.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
             ColCard.BorderSizePixel = 0
@@ -5686,9 +5697,30 @@ end
                     end
                 end
 
-                -- Camera setup: positioned at (0, 0, camDist) looking directly at (0, 0, 0)
-                local camDist = modelHeight * 1.46
-                Camera.CFrame = CFrame.lookAt(Vector3.new(0, 0, camDist), Vector3.new(0, 0, 0))
+                -- Camera setup: Shifted target right (+0.38) in world space, rendering the model noticeably to the LEFT on screen!
+                local lookTarget = Vector3.new(0.38, 0, 0)
+                -- camDist: scaled up to 2.08 so the model is smaller, elegant and fits with plenty of space
+                local camDist = modelHeight * 2.08
+                local frontPose = CFrame.Angles(0, math.pi, 0)
+
+                -- Initialize all parts to front-facing pose
+                for _, entry in ipairs(localPartOffsets) do
+                    if entry.part and entry.part.Parent then
+                        entry.part.CFrame = frontPose * entry.offset
+                    end
+                end
+
+                local currentYaw = 0
+                local yawVelocity = 0
+
+                local function updateCamera()
+                    local cosY = math.cos(currentYaw)
+                    local sinY = math.sin(currentYaw)
+                    local camPos = Vector3.new(lookTarget.X + sinY * camDist, lookTarget.Y, lookTarget.Z + cosY * camDist)
+                    Camera.CFrame = CFrame.lookAt(camPos, lookTarget)
+                end
+
+                updateCamera()
 
                 -- ESP Overlay Elements: Physically bound to the exact center of the 3D model
                 local Overlay = Instance.new("Frame")
@@ -5699,15 +5731,15 @@ end
                 Overlay.ZIndex = 28
                 Overlay.Parent = Viewport
 
-                -- 2D Box: Locked strictly to the center of the viewport surrounding the 3D character
+                -- 2D Box: Positioned to the left (0.44) and proportionally scaled to the smaller model (84 x 148)
                 local BoxFrame = Instance.new("Frame")
                 BoxFrame.Name = "PreviewBox"
                 BoxFrame.Active = false
                 BoxFrame.BackgroundTransparency = 1
                 BoxFrame.BorderSizePixel = 0
                 BoxFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-                BoxFrame.Position = UDim2.new(0.5, 0, 0.48, 0)
-                BoxFrame.Size = UDim2.new(0, 114, 0, 206)
+                BoxFrame.Position = UDim2.new(0.44, 0, 0.48, 0)
+                BoxFrame.Size = UDim2.new(0, 84, 0, 148)
                 BoxFrame.ZIndex = 29
                 BoxFrame.Parent = Overlay
 
@@ -5799,25 +5831,24 @@ end
                 DistLabel.ZIndex = 32
                 DistLabel.Parent = BottomContainer
 
-                -- Projection update: Applies exact stationary CFrame and box bounds
-                local function updateProjection()
+                -- Pose setup: sets character model parts strictly once on mode change (0 lag during rotation)
+                local function applyPose()
                     if not characterModel or not characterModel.Parent then return end
 
                     local isSleeper = (targetType == "Sleeper")
-                    local poseCFrame = CFrame.Angles(0, math.pi + currentYaw, 0)
-                    if isSleeper then
-                        poseCFrame = CFrame.new(0, -modelHeight * 0.22, 0) * CFrame.Angles(math.rad(-90), math.pi + currentYaw, 0)
-                        BoxFrame.Position = UDim2.new(0.5, 0, 0.62, 0)
-                        BoxFrame.Size = UDim2.new(0, 175, 0, 82)
-                    else
-                        BoxFrame.Position = UDim2.new(0.5, 0, 0.48, 0)
-                        BoxFrame.Size = UDim2.new(0, 114, 0, 206)
-                    end
-
+                    local sleeperPose = CFrame.new(0, -modelHeight * 0.22, 0) * CFrame.Angles(math.rad(-90), 0, 0) * frontPose
                     for _, entry in ipairs(localPartOffsets) do
                         if entry.part and entry.part.Parent then
-                            entry.part.CFrame = poseCFrame * entry.offset
+                            entry.part.CFrame = isSleeper and (sleeperPose * entry.offset) or (frontPose * entry.offset)
                         end
+                    end
+
+                    if isSleeper then
+                        BoxFrame.Position = UDim2.new(0.44, 0, 0.58, 0)
+                        BoxFrame.Size = UDim2.new(0, 128, 0, 64)
+                    else
+                        BoxFrame.Position = UDim2.new(0.44, 0, 0.48, 0)
+                        BoxFrame.Size = UDim2.new(0, 84, 0, 148)
                     end
 
                     local hasWeap = (currentSettings.ShowWeapon ~= false)
@@ -5861,12 +5892,13 @@ end
                     WeaponLabel.Text = currentWeaponName
                     WeaponLabel.TextColor3 = currentSettings.WeaponColor or Color3.fromRGB(255, 255, 255)
 
-                    updateProjection()
+                    applyPose()
+                    updateCamera()
                 end
 
                 applySettingsFunc()
 
-                -- Drag Interaction on Viewport (Ultra-smooth 144Hz Inertia Damping)
+                -- Drag Interaction on Viewport (Ultra-smooth 144Hz Camera Orbit with Inertia)
                 local Hitbox = Instance.new("Frame")
                 Hitbox.Name = "PreviewHitbox"
                 Hitbox.Active = false
@@ -5901,17 +5933,23 @@ end
                             return
                         end
 
-                        local diff = targetYaw - currentYaw
-                        if math.abs(diff) > 0.0002 or activePreviewDrag then
-                            local alpha = math.clamp(1 - math.exp(-22 * dt), 0, 1)
-                            currentYaw = currentYaw + diff * alpha
-                            updateProjection()
+                        dt = math.clamp(dt, 0.001, 0.05)
+
+                        if activePreviewDrag then
+                            -- Smooth decay of fling velocity when mouse is held still
+                            yawVelocity = yawVelocity * math.exp(-14 * dt)
                         else
-                            currentYaw = targetYaw
-                            updateProjection()
-                            if smoothConn and not activePreviewDrag then
-                                smoothConn:Disconnect()
-                                smoothConn = nil
+                            -- Ultra-smooth physics inertia coasting on release
+                            if math.abs(yawVelocity) > 0.00008 then
+                                currentYaw = currentYaw + yawVelocity * (dt * 60)
+                                yawVelocity = yawVelocity * math.exp(-6.5 * dt)
+                                updateCamera()
+                            else
+                                yawVelocity = 0
+                                if smoothConn then
+                                    smoothConn:Disconnect()
+                                    smoothConn = nil
+                                end
                             end
                         end
                     end)
@@ -5920,12 +5958,19 @@ end
                 table.insert(clickableRegistry, {
                     object = Hitbox,
                     onClick = function(clickX)
+                        yawVelocity = 0
+                        ensureSmoothLoop()
                         activePreviewDrag = {
-                            startX = clickX,
-                            startTargetYaw = targetYaw,
+                            lastX = clickX,
                             update = function(mx)
-                                local dx = mx - activePreviewDrag.startX
-                                targetYaw = activePreviewDrag.startTargetYaw - dx * 0.011
+                                local dx = mx - activePreviewDrag.lastX
+                                activePreviewDrag.lastX = mx
+                                if dx ~= 0 then
+                                    local step = -dx * 0.0065
+                                    currentYaw = currentYaw + step
+                                    yawVelocity = yawVelocity * 0.25 + step * 0.75
+                                    updateCamera()
+                                end
                                 ensureSmoothLoop()
                                 if hintLabel.Visible then hintLabel.Visible = false end
                             end,
@@ -5933,7 +5978,6 @@ end
                                 ensureSmoothLoop()
                             end
                         }
-                        ensureSmoothLoop()
                     end,
                     onHover = function(isHov)
                         TweenService:Create(RowStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
@@ -5958,8 +6002,8 @@ end
                     end,
                     ResetRotation = function(self)
                         currentYaw = 0
-                        targetYaw = 0
-                        updateProjection()
+                        yawVelocity = 0
+                        updateCamera()
                     end
                 }
             end
@@ -5975,6 +6019,10 @@ end
             end
             return createColumnInternal(targetScroll, colTitle, customIcon)
         end
+        Tab.CreateSection = Tab.CreateColumn
+        Tab.CreateGroupbox = Tab.CreateColumn
+        Tab.AddColumn = Tab.CreateColumn
+        Tab.AddSection = Tab.CreateColumn
 
         function Tab:CreateSubTab(subTabName, customIcon)
             local bar = getOrCreateSubtabsBar()
@@ -6048,12 +6096,12 @@ end
             SubBtnText.ZIndex = 27
             SubBtnText.Parent = SubBtn
 
-            -- Dedicated SubTab Page
+            -- Dedicated SubTab Page (Mathematically aligned to 14px grid)
             local SubPage = Instance.new("Frame")
             SubPage.Name = "SubPage_" .. subTabName
             SubPage.Active = false
             SubPage.Size = UDim2.new(1, 0, 1, -48)
-            SubPage.Position = UDim2.new(0, 0, 0, 46)
+            SubPage.Position = UDim2.new(0, 0, 0, 48)
             SubPage.BackgroundTransparency = 1
             SubPage.ClipsDescendants = true
             SubPage.Visible = false
@@ -6063,13 +6111,15 @@ end
             local SubLeftScroll = Instance.new("ScrollingFrame")
             SubLeftScroll.Name = "SubLeftScroll"
             SubLeftScroll.Active = false
-            SubLeftScroll.Size = UDim2.new(0, 326, 1, -10)
-            SubLeftScroll.Position = UDim2.new(0, 14, 0, 5)
+            SubLeftScroll.Size = UDim2.new(0, 324, 1, -10)
+            SubLeftScroll.Position = UDim2.new(0, 14, 0, 0)
             SubLeftScroll.BackgroundTransparency = 1
             SubLeftScroll.BorderSizePixel = 0
-            SubLeftScroll.ScrollBarThickness = 3
-            SubLeftScroll.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
-            SubLeftScroll.ScrollBarImageTransparency = 0
+            SubLeftScroll.ScrollBarThickness = 2
+            SubLeftScroll.ScrollBarImageColor3 = Color3.fromRGB(55, 60, 75)
+            SubLeftScroll.ScrollBarImageTransparency = 0.2
+            SubLeftScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
+            SubLeftScroll.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
             SubLeftScroll.ClipsDescendants = true
             SubLeftScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
             SubLeftScroll.ZIndex = 21
@@ -6081,20 +6131,18 @@ end
             SubLeftLayout.Padding = UDim.new(0, 12)
             SubLeftLayout.Parent = SubLeftScroll
 
-            SubLeftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                SubLeftScroll.CanvasSize = UDim2.new(0, 0, 0, SubLeftLayout.AbsoluteContentSize.Y + 24)
-            end)
-
             local SubRightScroll = Instance.new("ScrollingFrame")
             SubRightScroll.Name = "SubRightScroll"
             SubRightScroll.Active = false
-            SubRightScroll.Size = UDim2.new(0, 326, 1, -10)
-            SubRightScroll.Position = UDim2.new(0, 350, 0, 5)
+            SubRightScroll.Size = UDim2.new(0, 324, 1, -10)
+            SubRightScroll.Position = UDim2.new(0, 352, 0, 0)
             SubRightScroll.BackgroundTransparency = 1
             SubRightScroll.BorderSizePixel = 0
-            SubRightScroll.ScrollBarThickness = 3
-            SubRightScroll.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
-            SubRightScroll.ScrollBarImageTransparency = 0
+            SubRightScroll.ScrollBarThickness = 2
+            SubRightScroll.ScrollBarImageColor3 = Color3.fromRGB(55, 60, 75)
+            SubRightScroll.ScrollBarImageTransparency = 0.2
+            SubRightScroll.VerticalScrollBarInset = Enum.ScrollBarInset.None
+            SubRightScroll.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
             SubRightScroll.ClipsDescendants = true
             SubRightScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
             SubRightScroll.ZIndex = 21
@@ -6105,10 +6153,6 @@ end
             SubRightLayout.SortOrder = Enum.SortOrder.LayoutOrder
             SubRightLayout.Padding = UDim.new(0, 12)
             SubRightLayout.Parent = SubRightScroll
-
-            SubRightLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                SubRightScroll.CanvasSize = UDim2.new(0, 0, 0, SubRightLayout.AbsoluteContentSize.Y + 24)
-            end)
 
             local subEntry = {
                 btn = SubBtn,
@@ -6192,6 +6236,10 @@ end
                 end
                 return createColumnInternal(target, colTitle, customIcon)
             end
+            SubTab.CreateSection = SubTab.CreateColumn
+            SubTab.CreateGroupbox = SubTab.CreateColumn
+            SubTab.AddColumn = SubTab.CreateColumn
+            SubTab.AddSection = SubTab.CreateColumn
             return SubTab
         end
 
