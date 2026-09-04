@@ -5553,6 +5553,9 @@ end
                 local currentWeaponName = previewConfig.WeaponName or "AK-47"
                 local currentYaw = 0
                 local targetYaw = 0
+                local yawVelocity = 0
+                local isDragging = false
+                local dragSensitivity = 0.016
 
                 local Row = Instance.new("Frame")
                 Row.Name = "ESPPreviewRow"
@@ -5674,6 +5677,58 @@ end
                 local characterModel = loadRig()
                 characterModel.Parent = Viewport
 
+                -- Pre-cache rig parts once (ZERO FindFirstChild calls during mouse rotation = ZERO lag spikes)
+                local rigParts = {}
+                local function cacheRigParts()
+                    rigParts = {}
+                    if not characterModel then return end
+
+                    local descendants = characterModel:GetDescendants()
+                    local function findPart(...)
+                        local names = {...}
+                        for _, targetName in ipairs(names) do
+                            local lowerTarget = targetName:lower()
+                            for _, child in ipairs(characterModel:GetChildren()) do
+                                if child.Name:lower() == lowerTarget and (child:IsA("BasePart") or child:IsA("Bone") or child:IsA("Attachment")) then
+                                    return child
+                                end
+                            end
+                            for _, d in ipairs(descendants) do
+                                if d.Name:lower() == lowerTarget and (d:IsA("BasePart") or d:IsA("Bone") or d:IsA("Attachment")) then
+                                    return d
+                                end
+                            end
+                        end
+                        return nil
+                    end
+
+                    rigParts.head = findPart("Head")
+                    rigParts.torso = findPart("UpperTorso", "Torso", "Chest", "HumanoidRootPart") or characterModel.PrimaryPart or characterModel:FindFirstChildWhichIsA("BasePart")
+                    rigParts.lowerTorso = findPart("LowerTorso", "Pelvis", "Hips")
+
+                    rigParts.lua = findPart("LeftUpperArm", "c_LeftUpperArm", "UpperArm_L")
+                    rigParts.lla = findPart("LeftLowerArm", "c_LeftLowerArm", "LowerArm_L", "LeftForearm")
+                    rigParts.lh  = findPart("LeftHand", "Hand_L")
+
+                    rigParts.rua = findPart("RightUpperArm", "c_RightUpperArm", "UpperArm_R")
+                    rigParts.rla = findPart("RightLowerArm", "c_RightLowerArm", "LowerArm_R", "RightForearm")
+                    rigParts.rh  = findPart("RightHand", "Hand_R")
+
+                    rigParts.lul = findPart("LeftUpperLeg", "UpperLeg_L")
+                    rigParts.lll = findPart("LeftLowerLeg", "LowerLeg_L", "LeftCalf")
+                    rigParts.lf  = findPart("LeftFoot", "Foot_L")
+
+                    rigParts.rul = findPart("RightUpperLeg", "UpperLeg_R")
+                    rigParts.rll = findPart("RightLowerLeg", "LowerLeg_R", "RightCalf")
+                    rigParts.rf  = findPart("RightFoot", "Foot_R")
+
+                    rigParts.leftArm = findPart("Left Arm", "LeftArm", "Left_Arm")
+                    rigParts.rightArm = findPart("Right Arm", "RightArm", "Right_Arm")
+                    rigParts.leftLeg = findPart("Left Leg", "LeftLeg", "Left_Leg")
+                    rigParts.rightLeg = findPart("Right Leg", "RightLeg", "Right_Leg")
+                end
+                cacheRigParts()
+
                 -- Strip any scripts, body movers, sounds, constraints to eliminate lag
                 for _, inst in ipairs(characterModel:GetDescendants()) do
                     if inst:IsA("LuaSourceContainer") or inst:IsA("BodyMover") or inst:IsA("Constraint") or inst:IsA("Sound") then
@@ -5744,10 +5799,9 @@ end
                     end
                 end
 
-                -- Camera setup: Shifted target right (+0.38) in world space, rendering the model noticeably to the LEFT on screen!
-                local lookTarget = Vector3.new(0.38, 0, 0)
-                -- camDist: scaled up to 2.75 so the model is smaller, elegant, placed further into the distance with plenty of breathing room
-                local camDist = modelHeight * 2.75
+                -- Camera setup: Spine centered at (0, 0, 0) for perfect 360-degree axial rotation without wobble
+                local lookTarget = Vector3.new(0, 0, 0)
+                local camDist = math.max(modelHeight * 2.8, 14.5)
                 local frontPose = CFrame.Angles(0, math.pi, 0)
 
                 -- Initialize all parts to front-facing pose
@@ -5757,14 +5811,14 @@ end
                     end
                 end
 
-                local currentYaw = 0
-                local yawVelocity = 0
+                local updatePreviewSkeleton = function() end
 
                 local function updateCamera()
                     local cosY = math.cos(currentYaw)
                     local sinY = math.sin(currentYaw)
                     local camPos = Vector3.new(lookTarget.X + sinY * camDist, lookTarget.Y, lookTarget.Z + cosY * camDist)
                     Camera.CFrame = CFrame.lookAt(camPos, lookTarget)
+                    updatePreviewSkeleton()
                 end
 
                 updateCamera()
@@ -5778,14 +5832,14 @@ end
                 Overlay.ZIndex = 28
                 Overlay.Parent = Viewport
 
-                -- 2D Box: Positioned with symmetrical margins (0.51) and expanded to the right to frame both arms (108 x 180)
+                -- 2D Box: Perfectly centered on character spine (0.50) to frame both arms symmetrically (108 x 180)
                 local BoxFrame = Instance.new("Frame")
                 BoxFrame.Name = "PreviewBox"
                 BoxFrame.Active = false
                 BoxFrame.BackgroundTransparency = 1
                 BoxFrame.BorderSizePixel = 0
                 BoxFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-                BoxFrame.Position = UDim2.new(0.51, 0, 0.50, 0)
+                BoxFrame.Position = UDim2.new(0.50, 0, 0.50, 0)
                 BoxFrame.Size = UDim2.new(0, 108, 0, 180)
                 BoxFrame.ZIndex = 29
                 BoxFrame.Parent = Overlay
@@ -5817,33 +5871,255 @@ end
                 boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 boxStroke.Parent = BoxFrame
 
-                -- Preview Skeleton (Bones mapped to dummy joints)
+                -- 3D Dynamic Preview Skeleton (Real-time 3D projected skeletal rigging)
+                local SkeletonOverlay = Instance.new("Frame")
+                SkeletonOverlay.Name = "PreviewSkeletonOverlay"
+                SkeletonOverlay.Active = false
+                SkeletonOverlay.BackgroundTransparency = 1
+                SkeletonOverlay.Size = UDim2.new(1, 0, 1, 0)
+                SkeletonOverlay.ZIndex = 30
+                SkeletonOverlay.Parent = Overlay
+
                 local skeletonLines = {}
-                local function makeSkelBone(name, size, pos, rot)
+                for i = 1, 15 do
                     local b = Instance.new("Frame")
-                    b.Name = name
+                    b.Name = "Bone_" .. i
                     b.Active = false
-                    b.Size = size
-                    b.Position = pos
-                    b.AnchorPoint = Vector2.new(0.5, 0.5)
-                    b.Rotation = rot or 0
-                    b.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
                     b.BorderSizePixel = 0
+                    b.AnchorPoint = Vector2.new(0.5, 0.5)
                     b.ZIndex = 31
                     b.Visible = false
-                    b.Parent = BoxFrame
+                    b.Parent = SkeletonOverlay
                     table.insert(skeletonLines, b)
-                    return b
                 end
 
-                makeSkelBone("HeadNeck", UDim2.new(0, 1.5, 0, 18), UDim2.new(0.5, 0, 0.08, 0))
-                makeSkelBone("Spine", UDim2.new(0, 1.5, 0, 48), UDim2.new(0.5, 0, 0.26, 0))
-                makeSkelBone("Shoulders", UDim2.new(0, 52, 0, 1.5), UDim2.new(0.5, 0, 0.17, 0))
-                makeSkelBone("LeftArm", UDim2.new(0, 1.5, 0, 52), UDim2.new(0.24, 0, 0.33, 0), 4)
-                makeSkelBone("RightArm", UDim2.new(0, 1.5, 0, 52), UDim2.new(0.76, 0, 0.33, 0), -4)
-                makeSkelBone("Pelvis", UDim2.new(0, 32, 0, 1.5), UDim2.new(0.5, 0, 0.45, 0))
-                makeSkelBone("LeftLeg", UDim2.new(0, 1.5, 0, 78), UDim2.new(0.36, 0, 0.70, 0), -3)
-                makeSkelBone("RightLeg", UDim2.new(0, 1.5, 0, 78), UDim2.new(0.64, 0, 0.70, 0), 3)
+                local headDot = Instance.new("Frame")
+                headDot.Name = "HeadDot"
+                headDot.Active = false
+                headDot.Size = UDim2.new(0, 6, 0, 6)
+                headDot.AnchorPoint = Vector2.new(0.5, 0.5)
+                headDot.BorderSizePixel = 0
+                headDot.ZIndex = 32
+                headDot.Visible = false
+                local dotCorner = Instance.new("UICorner")
+                dotCorner.CornerRadius = UDim.new(1, 0)
+                dotCorner.Parent = headDot
+                headDot.Parent = SkeletonOverlay
+
+                local function getRigJoints(model)
+                    local torso = rigParts.torso
+                    if not torso or not torso.Parent then return nil end
+
+                    local head = rigParts.head
+                    local lowerTorso = rigParts.lowerTorso
+
+                    local lua = rigParts.lua
+                    local lla = rigParts.lla
+                    local lh  = rigParts.lh
+
+                    local rua = rigParts.rua
+                    local rla = rigParts.rla
+                    local rh  = rigParts.rh
+
+                    local lul = rigParts.lul
+                    local lll = rigParts.lll
+                    local lf  = rigParts.lf
+
+                    local rul = rigParts.rul
+                    local rll = rigParts.rll
+                    local rf  = rigParts.rf
+
+                    local leftArm = rigParts.leftArm
+                    local rightArm = rigParts.rightArm
+                    local leftLeg = rigParts.leftLeg
+                    local rightLeg = rigParts.rightLeg
+
+                    local torsoPos = torso.Position
+                    local torsoCF = torso.CFrame
+
+                    local joints = {}
+
+                    -- Head & Neck
+                    if head and head.Parent then
+                        local headCF = head.CFrame
+                        joints.head = head.Position + headCF.UpVector * (head.Size.Y * 0.35)
+                        joints.neck = head.Position - headCF.UpVector * (head.Size.Y * 0.45)
+                    else
+                        joints.head = torsoPos + torsoCF.UpVector * (torso.Size.Y * 0.9)
+                        joints.neck = torsoPos + torsoCF.UpVector * (torso.Size.Y * 0.5)
+                    end
+
+                    -- Spine & Pelvis
+                    joints.spine = torsoPos
+                    if lowerTorso and lowerTorso.Parent then
+                        joints.pelvis = lowerTorso.Position
+                        joints.leftHip = lowerTorso.Position - lowerTorso.CFrame.RightVector * (lowerTorso.Size.X * 0.35)
+                        joints.rightHip = lowerTorso.Position + lowerTorso.CFrame.RightVector * (lowerTorso.Size.X * 0.35)
+                    else
+                        joints.pelvis = torsoPos - torsoCF.UpVector * (torso.Size.Y * 0.45)
+                        joints.leftHip = joints.pelvis - torsoCF.RightVector * (torso.Size.X * 0.35)
+                        joints.rightHip = joints.pelvis + torsoCF.RightVector * (torso.Size.X * 0.35)
+                    end
+
+                    -- Shoulders
+                    joints.leftShoulder = torsoPos - torsoCF.RightVector * (torso.Size.X * 0.48) + torsoCF.UpVector * (torso.Size.Y * 0.38)
+                    joints.rightShoulder = torsoPos + torsoCF.RightVector * (torso.Size.X * 0.48) + torsoCF.UpVector * (torso.Size.Y * 0.38)
+
+                    -- Left Arm
+                    if lua and lla and lh and lua.Parent and lla.Parent and lh.Parent then
+                        joints.leftShoulder = lua.Position + lua.CFrame.UpVector * (lua.Size.Y * 0.4)
+                        joints.leftElbow = lla.Position
+                        joints.leftHand = lh.Position
+                    elseif leftArm and leftArm.Parent then
+                        joints.leftShoulder = leftArm.Position + leftArm.CFrame.UpVector * (leftArm.Size.Y * 0.4)
+                        joints.leftElbow = leftArm.Position
+                        joints.leftHand = leftArm.Position - leftArm.CFrame.UpVector * (leftArm.Size.Y * 0.4)
+                    else
+                        joints.leftElbow = joints.leftShoulder - torsoCF.UpVector * 1.3
+                        joints.leftHand = joints.leftElbow - torsoCF.UpVector * 1.2
+                    end
+
+                    -- Right Arm
+                    if rua and rla and rh and rua.Parent and rla.Parent and rh.Parent then
+                        joints.rightShoulder = rua.Position + rua.CFrame.UpVector * (rua.Size.Y * 0.4)
+                        joints.rightElbow = rla.Position
+                        joints.rightHand = rh.Position
+                    elseif rightArm and rightArm.Parent then
+                        joints.rightShoulder = rightArm.Position + rightArm.CFrame.UpVector * (rightArm.Size.Y * 0.4)
+                        joints.rightElbow = rightArm.Position
+                        joints.rightHand = rightArm.Position - rightArm.CFrame.UpVector * (rightArm.Size.Y * 0.4)
+                    else
+                        joints.rightElbow = joints.rightShoulder - torsoCF.UpVector * 1.3
+                        joints.rightHand = joints.rightElbow - torsoCF.UpVector * 1.2
+                    end
+
+                    -- Left Leg
+                    if lul and lll and lf and lul.Parent and lll.Parent and lf.Parent then
+                        joints.leftHip = lul.Position + lul.CFrame.UpVector * (lul.Size.Y * 0.4)
+                        joints.leftKnee = lll.Position
+                        joints.leftFoot = lf.Position
+                    elseif leftLeg and leftLeg.Parent then
+                        joints.leftHip = leftLeg.Position + leftLeg.CFrame.UpVector * (leftLeg.Size.Y * 0.4)
+                        joints.leftKnee = leftLeg.Position
+                        joints.leftFoot = leftLeg.Position - leftLeg.CFrame.UpVector * (leftLeg.Size.Y * 0.45)
+                    else
+                        joints.leftKnee = joints.leftHip - torsoCF.UpVector * 1.4
+                        joints.leftFoot = joints.leftKnee - torsoCF.UpVector * 1.4
+                    end
+
+                    -- Right Leg
+                    if rul and rll and rf and rul.Parent and rll.Parent and rf.Parent then
+                        joints.rightHip = rul.Position + rul.CFrame.UpVector * (rul.Size.Y * 0.4)
+                        joints.rightKnee = rll.Position
+                        joints.rightFoot = rf.Position
+                    elseif rightLeg and rightLeg.Parent then
+                        joints.rightHip = rightLeg.Position + rightLeg.CFrame.UpVector * (rightLeg.Size.Y * 0.4)
+                        joints.rightKnee = rightLeg.Position
+                        joints.rightFoot = rightLeg.Position - rightLeg.CFrame.UpVector * (rightLeg.Size.Y * 0.45)
+                    else
+                        joints.rightKnee = joints.rightHip - torsoCF.UpVector * 1.4
+                        joints.rightFoot = joints.rightKnee - torsoCF.UpVector * 1.4
+                    end
+
+                    return joints
+                end
+
+                local segments = {
+                    {"head", "neck"},
+                    {"neck", "spine"},
+                    {"spine", "pelvis"},
+                    {"neck", "leftShoulder"},
+                    {"leftShoulder", "leftElbow"},
+                    {"leftElbow", "leftHand"},
+                    {"neck", "rightShoulder"},
+                    {"rightShoulder", "rightElbow"},
+                    {"rightElbow", "rightHand"},
+                    {"pelvis", "leftHip"},
+                    {"leftHip", "leftKnee"},
+                    {"leftKnee", "leftFoot"},
+                    {"pelvis", "rightHip"},
+                    {"rightHip", "rightKnee"},
+                    {"rightKnee", "rightFoot"}
+                }
+
+                local function projectPoint(worldPos)
+                    if not worldPos then return nil end
+                    local camSpace = Camera.CFrame:PointToObjectSpace(worldPos)
+                    local depth = -camSpace.Z
+                    if depth <= 0.2 then return nil end
+
+                    local halfH = math.tan(math.rad(Camera.FieldOfView * 0.5)) * depth
+                    local vW = Viewport.AbsoluteSize.X
+                    local vH = Viewport.AbsoluteSize.Y
+                    if vW <= 0 or vH <= 0 then
+                        vW = Row.AbsoluteSize.X
+                        vH = Row.AbsoluteSize.Y
+                    end
+                    if vW <= 0 or vH <= 0 then
+                        vW = 252
+                        vH = 230
+                    end
+
+                    local scale = (vH * 0.5) / halfH
+                    local screenX = (vW * 0.5) + (camSpace.X * scale)
+                    local screenY = (vH * 0.5) - (camSpace.Y * scale)
+                    return Vector2.new(screenX, screenY)
+                end
+
+                updatePreviewSkeleton = function()
+                    local masterEnabled = (currentSettings.Enabled ~= false)
+                    local showSkeleton = masterEnabled and (currentSettings.ShowSkeleton == true) and (targetType ~= "Sleeper")
+                    if not showSkeleton then
+                        SkeletonOverlay.Visible = false
+                        return
+                    end
+
+                    SkeletonOverlay.Visible = true
+                    local joints = getRigJoints(characterModel)
+                    if not joints then
+                        SkeletonOverlay.Visible = false
+                        return
+                    end
+
+                    local skelColor = currentSettings.SkeletonColor or Color3.fromRGB(255, 255, 255)
+
+                    for idx, seg in ipairs(segments) do
+                        local line = skeletonLines[idx]
+                        local pA = joints[seg[1]]
+                        local pB = joints[seg[2]]
+                        if line and pA and pB then
+                            local p1 = projectPoint(pA)
+                            local p2 = projectPoint(pB)
+                            if p1 and p2 then
+                                local dx = p2.X - p1.X
+                                local dy = p2.Y - p1.Y
+                                local len = math.sqrt(dx * dx + dy * dy)
+                                local angle = math.deg(math.atan2(dy, dx))
+
+                                line.Size = UDim2.new(0, len, 0, 1.5)
+                                line.Position = UDim2.new(0, (p1.X + p2.X) * 0.5, 0, (p1.Y + p2.Y) * 0.5)
+                                line.Rotation = angle
+                                line.BackgroundColor3 = skelColor
+                                line.Visible = true
+                            else
+                                line.Visible = false
+                            end
+                        elseif line then
+                            line.Visible = false
+                        end
+                    end
+
+                    if headDot and joints.head then
+                        local hp = projectPoint(joints.head)
+                        if hp then
+                            headDot.Position = UDim2.new(0, hp.X, 0, hp.Y)
+                            headDot.BackgroundColor3 = skelColor
+                            headDot.Visible = true
+                        else
+                            headDot.Visible = false
+                        end
+                    end
+                end
 
                 -- Top Label: Attached to top edge of BoxFrame (strictly above head, no face overlap)
                 local TopLabel = Instance.new("TextLabel")
@@ -5925,7 +6201,7 @@ end
                         BoxFrame.Position = UDim2.new(0.50, 0, 0.58, 0)
                         BoxFrame.Size = UDim2.new(0, 96, 0, 48)
                     else
-                        BoxFrame.Position = UDim2.new(0.51, 0, 0.50, 0)
+                        BoxFrame.Position = UDim2.new(0.50, 0, 0.50, 0)
                         BoxFrame.Size = UDim2.new(0, 108, 0, 180)
                     end
 
@@ -5976,16 +6252,9 @@ end
                     WeaponLabel.Text = currentWeaponName
                     WeaponLabel.TextColor3 = currentSettings.WeaponColor or Color3.fromRGB(255, 255, 255)
 
-                    -- 6. Skeleton Bones
-                    local showSkeleton = masterEnabled and (currentSettings.ShowSkeleton == true) and (targetType ~= "Sleeper")
-                    local skelColor = currentSettings.SkeletonColor or Color3.fromRGB(255, 255, 255)
-                    for _, bone in ipairs(skeletonLines) do
-                        bone.Visible = showSkeleton
-                        bone.BackgroundColor3 = skelColor
-                    end
-
                     applyPose()
                     updateCamera()
+                    updatePreviewSkeleton()
                 end
 
                 applySettingsFunc()
@@ -6027,17 +6296,27 @@ end
 
                         dt = math.clamp(dt, 0.001, 0.05)
 
-                        if activePreviewDrag then
-                            -- Smooth decay of fling velocity when mouse is held still
-                            yawVelocity = yawVelocity * math.exp(-14 * dt)
-                        else
-                            -- Ultra-smooth physics inertia coasting on release
-                            if math.abs(yawVelocity) > 0.00008 then
-                                currentYaw = currentYaw + yawVelocity * (dt * 60)
-                                yawVelocity = yawVelocity * math.exp(-6.5 * dt)
-                                updateCamera()
+                        if not isDragging then
+                            -- Coast with natural physics inertia after mouse release
+                            if math.abs(yawVelocity) > 0.0001 then
+                                targetYaw = targetYaw + yawVelocity * dt
+                                yawVelocity = yawVelocity * math.exp(-5.0 * dt)
                             else
                                 yawVelocity = 0
+                            end
+                        end
+
+                        -- Silky smooth 144Hz critically-damped lerp towards targetYaw
+                        local diff = targetYaw - currentYaw
+                        if math.abs(diff) > 0.0001 or math.abs(yawVelocity) > 0.0001 then
+                            local lerpSpeed = isDragging and 36 or 24
+                            local alpha = 1 - math.exp(-lerpSpeed * dt)
+                            currentYaw = currentYaw + diff * alpha
+                            updateCamera()
+                        else
+                            currentYaw = targetYaw
+                            if not isDragging and math.abs(yawVelocity) < 0.0001 then
+                                updateCamera()
                                 if smoothConn then
                                     smoothConn:Disconnect()
                                     smoothConn = nil
@@ -6050,23 +6329,41 @@ end
                 table.insert(clickableRegistry, {
                     object = Hitbox,
                     onClick = function(clickX)
+                        isDragging = true
                         yawVelocity = 0
                         ensureSmoothLoop()
+                        local lastTime = tick()
+                        local lastX = clickX
                         activePreviewDrag = {
-                            lastX = clickX,
                             update = function(mx)
-                                local dx = mx - activePreviewDrag.lastX
-                                activePreviewDrag.lastX = mx
+                                local now = tick()
+                                local dx = mx - lastX
+                                local dtDrag = now - lastTime
+                                lastX = mx
+                                lastTime = now
+
                                 if dx ~= 0 then
-                                    local step = -dx * 0.0065
-                                    currentYaw = currentYaw + step
-                                    yawVelocity = yawVelocity * 0.25 + step * 0.75
-                                    updateCamera()
+                                    local step = -dx * dragSensitivity
+                                    targetYaw = targetYaw + step
+                                    -- Instantaneous velocity tracking for flick momentum
+                                    if dtDrag > 0.001 then
+                                        local instVel = step / dtDrag
+                                        yawVelocity = yawVelocity * 0.35 + instVel * 0.65
+                                    else
+                                        yawVelocity = step * 60
+                                    end
                                 end
                                 ensureSmoothLoop()
                                 if hintLabel.Visible then hintLabel.Visible = false end
                             end,
                             finish = function()
+                                isDragging = false
+                                local timeSinceMove = tick() - lastTime
+                                if timeSinceMove > 0.08 then
+                                    yawVelocity = 0
+                                else
+                                    yawVelocity = math.clamp(yawVelocity, -12, 12)
+                                end
                                 ensureSmoothLoop()
                             end
                         }
@@ -6099,8 +6396,12 @@ end
                     end,
                     ResetRotation = function(self)
                         currentYaw = 0
+                        targetYaw = 0
                         yawVelocity = 0
                         updateCamera()
+                    end,
+                    UpdateSkeleton = function(self)
+                        updatePreviewSkeleton()
                     end
                 }
             end
