@@ -4304,10 +4304,24 @@ end
                 ThumbStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 ThumbStroke.Parent = Thumb
 
+                local function countDec(n)
+                    if not n or n % 1 == 0 then return 0 end
+                    local str = tostring(n)
+                    local d = str:match("%.(%d+)")
+                    return d and math.min(#d, 3) or 0
+                end
+                local precision = math.max(countDec(min), countDec(max), countDec(defaultVal))
+                local mult = 10 ^ precision
+
                 local function setSlider(val)
-                    curVal = math.clamp(math.round(val), min, max)
+                    if precision > 0 then
+                        curVal = math.clamp(math.round(val * mult) / mult, min, max)
+                        ValBox.Text = string.format("%." .. precision .. "f", curVal)
+                    else
+                        curVal = math.clamp(math.round(val), min, max)
+                        ValBox.Text = tostring(curVal)
+                    end
                     local pct = (max > min) and ((curVal - min) / (max - min)) or 0
-                    ValBox.Text = tostring(curVal)
                     Fill.Size = UDim2.new(pct, 0, 1, 0)
                     Thumb.Position = UDim2.new(pct, -5, 0.5, -5)
                     pcall(callback, curVal)
@@ -4317,8 +4331,14 @@ end
                     local trackPos = Track.AbsolutePosition
                     local trackSize = Track.AbsoluteSize
                     local pct = math.clamp((mouseX - trackPos.X) / trackSize.X, 0, 1)
-                    curVal = math.round(min + (max - min) * pct)
-                    ValBox.Text = tostring(curVal)
+                    local rawVal = min + (max - min) * pct
+                    if precision > 0 then
+                        curVal = math.clamp(math.round(rawVal * mult) / mult, min, max)
+                        ValBox.Text = string.format("%." .. precision .. "f", curVal)
+                    else
+                        curVal = math.round(rawVal)
+                        ValBox.Text = tostring(curVal)
+                    end
                     Fill.Size = UDim2.new(pct, 0, 1, 0)
                     Thumb.Position = UDim2.new(pct, -5, 0.5, -5)
                     pcall(callback, curVal)
@@ -5683,18 +5703,132 @@ end
                 end
                 return createColumnInternal(target, colTitle, customIcon)
             end
-
             return SubTab
         end
 
-        return Tab
+        Window.Notify = function(self, cfg)
+            DeadHub:Notify(cfg)
+        end
+
+        return Window
     end
 
-    return Window
-end
+    local notifScreenGui = nil
+    local notifContainer = nil
 
-if getgenv then
-    getgenv().DeadHub = DeadHub
-end
+    function DeadHub:Notify(config)
+        config = config or {}
+        local title = config.Title or "DEADHUB"
+        local content = config.Content or config.Text or ""
+        local duration = config.Duration or 2.5
 
-return DeadHub
+        pcall(function()
+            if not notifScreenGui or not notifScreenGui.Parent then
+                notifScreenGui = Instance.new("ScreenGui")
+                notifScreenGui.Name = "DeadHub_Notifications"
+                notifScreenGui.ResetOnSpawn = false
+                notifScreenGui.DisplayOrder = 9999
+                notifScreenGui.IgnoreGuiInset = true
+                notifScreenGui.Parent = parentContainer
+            end
+
+            if not notifContainer or not notifContainer.Parent then
+                notifContainer = Instance.new("Frame")
+                notifContainer.Name = "NotifContainer"
+                notifContainer.Active = false
+                notifContainer.BackgroundTransparency = 1
+                notifContainer.Position = UDim2.new(1, -250, 1, -30)
+                notifContainer.Size = UDim2.new(0, 230, 0, 0)
+                notifContainer.Parent = notifScreenGui
+
+                local layout = Instance.new("UIListLayout")
+                layout.FillDirection = Enum.FillDirection.Vertical
+                layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+                layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+                layout.SortOrder = Enum.SortOrder.LayoutOrder
+                layout.Padding = UDim.new(0, 6)
+                layout.Parent = notifContainer
+            end
+
+            local Card = Instance.new("Frame")
+            Card.Name = "NotifCard"
+            Card.Active = false
+            Card.Size = UDim2.new(0, 230, 0, 48)
+            Card.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+            Card.BorderSizePixel = 0
+            Card.BackgroundTransparency = 1
+
+            local Stroke = Instance.new("UIStroke")
+            Stroke.Thickness = 1
+            Stroke.Color = Color3.fromRGB(48, 52, 64)
+            Stroke.Transparency = 1
+            Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            Stroke.Parent = Card
+
+            local Accent = Instance.new("Frame")
+            Accent.Name = "Accent"
+            Accent.Active = false
+            Accent.Size = UDim2.new(0, 3, 1, 0)
+            Accent.Position = UDim2.new(0, 0, 0, 0)
+            Accent.BackgroundColor3 = Color3.fromRGB(230, 57, 70)
+            Accent.BorderSizePixel = 0
+            Accent.BackgroundTransparency = 1
+            Accent.Parent = Card
+
+            local TitleLabel = Instance.new("TextLabel")
+            TitleLabel.Name = "Title"
+            TitleLabel.Active = false
+            TitleLabel.Size = UDim2.new(1, -16, 0, 16)
+            TitleLabel.Position = UDim2.new(0, 12, 0, 6)
+            TitleLabel.BackgroundTransparency = 1
+            TitleLabel.Font = Enum.Font.GothamBold
+            TitleLabel.Text = title
+            TitleLabel.TextSize = 12
+            TitleLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
+            TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+            TitleLabel.TextTransparency = 1
+            TitleLabel.Parent = Card
+
+            local DescLabel = Instance.new("TextLabel")
+            DescLabel.Name = "Desc"
+            DescLabel.Active = false
+            DescLabel.Size = UDim2.new(1, -16, 0, 18)
+            DescLabel.Position = UDim2.new(0, 12, 0, 22)
+            DescLabel.BackgroundTransparency = 1
+            DescLabel.Font = Enum.Font.GothamMedium
+            DescLabel.Text = content
+            DescLabel.TextSize = 11
+            DescLabel.TextColor3 = Color3.fromRGB(175, 180, 195)
+            DescLabel.TextXAlignment = Enum.TextXAlignment.Left
+            DescLabel.TextTransparency = 1
+            DescLabel.Parent = Card
+
+            Card.Parent = notifContainer
+
+            local ti = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+            TweenService:Create(Card, ti, {BackgroundTransparency = 0}):Play()
+            TweenService:Create(Stroke, ti, {Transparency = 0}):Play()
+            TweenService:Create(Accent, ti, {BackgroundTransparency = 0}):Play()
+            TweenService:Create(TitleLabel, ti, {TextTransparency = 0}):Play()
+            TweenService:Create(DescLabel, ti, {TextTransparency = 0}):Play()
+
+            task.delay(duration, function()
+                local outTi = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+                local fade = TweenService:Create(Card, outTi, {BackgroundTransparency = 1})
+                TweenService:Create(Stroke, outTi, {Transparency = 1}):Play()
+                TweenService:Create(Accent, outTi, {BackgroundTransparency = 1}):Play()
+                TweenService:Create(TitleLabel, outTi, {TextTransparency = 1}):Play()
+                TweenService:Create(DescLabel, outTi, {TextTransparency = 1}):Play()
+                fade:Play()
+                fade.Completed:Connect(function()
+                    Card:Destroy()
+                end)
+            end)
+        end)
+    end
+
+    if getgenv then
+        getgenv().DeadHub = DeadHub
+    end
+
+    return DeadHub
