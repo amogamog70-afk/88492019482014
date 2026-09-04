@@ -6288,12 +6288,15 @@ end
             return SubTab
         end
 
-        Window.Notify = function(self, cfg)
-            DeadHub:Notify(cfg)
-        end
-
-        return Window
+        return Tab
     end
+
+    Window.Notify = function(self, cfg)
+        DeadHub:Notify(cfg)
+    end
+
+    return Window
+end
 
     local notifScreenGui = nil
     local notifContainer = nil
