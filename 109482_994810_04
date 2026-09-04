@@ -5778,15 +5778,15 @@ end
                 Overlay.ZIndex = 28
                 Overlay.Parent = Viewport
 
-                -- 2D Box: Positioned to the left (0.44) and scaled to naturally fit the character silhouette (78 x 178)
+                -- 2D Box: Positioned with symmetrical margins (0.51) and expanded to the right to frame both arms (108 x 180)
                 local BoxFrame = Instance.new("Frame")
                 BoxFrame.Name = "PreviewBox"
                 BoxFrame.Active = false
                 BoxFrame.BackgroundTransparency = 1
                 BoxFrame.BorderSizePixel = 0
                 BoxFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-                BoxFrame.Position = UDim2.new(0.44, 0, 0.50, 0)
-                BoxFrame.Size = UDim2.new(0, 78, 0, 178)
+                BoxFrame.Position = UDim2.new(0.51, 0, 0.50, 0)
+                BoxFrame.Size = UDim2.new(0, 108, 0, 180)
                 BoxFrame.ZIndex = 29
                 BoxFrame.Parent = Overlay
 
@@ -5816,6 +5816,34 @@ end
                 boxStroke.Transparency = 0.5
                 boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 boxStroke.Parent = BoxFrame
+
+                -- Preview Skeleton (Bones mapped to dummy joints)
+                local skeletonLines = {}
+                local function makeSkelBone(name, size, pos, rot)
+                    local b = Instance.new("Frame")
+                    b.Name = name
+                    b.Active = false
+                    b.Size = size
+                    b.Position = pos
+                    b.AnchorPoint = Vector2.new(0.5, 0.5)
+                    b.Rotation = rot or 0
+                    b.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                    b.BorderSizePixel = 0
+                    b.ZIndex = 31
+                    b.Visible = false
+                    b.Parent = BoxFrame
+                    table.insert(skeletonLines, b)
+                    return b
+                end
+
+                makeSkelBone("HeadNeck", UDim2.new(0, 1.5, 0, 18), UDim2.new(0.5, 0, 0.08, 0))
+                makeSkelBone("Spine", UDim2.new(0, 1.5, 0, 48), UDim2.new(0.5, 0, 0.26, 0))
+                makeSkelBone("Shoulders", UDim2.new(0, 52, 0, 1.5), UDim2.new(0.5, 0, 0.17, 0))
+                makeSkelBone("LeftArm", UDim2.new(0, 1.5, 0, 52), UDim2.new(0.24, 0, 0.33, 0), 4)
+                makeSkelBone("RightArm", UDim2.new(0, 1.5, 0, 52), UDim2.new(0.76, 0, 0.33, 0), -4)
+                makeSkelBone("Pelvis", UDim2.new(0, 32, 0, 1.5), UDim2.new(0.5, 0, 0.45, 0))
+                makeSkelBone("LeftLeg", UDim2.new(0, 1.5, 0, 78), UDim2.new(0.36, 0, 0.70, 0), -3)
+                makeSkelBone("RightLeg", UDim2.new(0, 1.5, 0, 78), UDim2.new(0.64, 0, 0.70, 0), 3)
 
                 -- Top Label: Attached to top edge of BoxFrame (strictly above head, no face overlap)
                 local TopLabel = Instance.new("TextLabel")
@@ -5894,11 +5922,11 @@ end
                     end
 
                     if isSleeper then
-                        BoxFrame.Position = UDim2.new(0.44, 0, 0.58, 0)
-                        BoxFrame.Size = UDim2.new(0, 78, 0, 48)
+                        BoxFrame.Position = UDim2.new(0.50, 0, 0.58, 0)
+                        BoxFrame.Size = UDim2.new(0, 96, 0, 48)
                     else
-                        BoxFrame.Position = UDim2.new(0.44, 0, 0.50, 0)
-                        BoxFrame.Size = UDim2.new(0, 78, 0, 178)
+                        BoxFrame.Position = UDim2.new(0.51, 0, 0.50, 0)
+                        BoxFrame.Size = UDim2.new(0, 108, 0, 180)
                     end
 
                     -- Чем дальше игрок, тем выше имя и тем ниже дистанция
@@ -5947,6 +5975,14 @@ end
                     WeaponLabel.Visible = showWeapon
                     WeaponLabel.Text = currentWeaponName
                     WeaponLabel.TextColor3 = currentSettings.WeaponColor or Color3.fromRGB(255, 255, 255)
+
+                    -- 6. Skeleton Bones
+                    local showSkeleton = masterEnabled and (currentSettings.ShowSkeleton == true) and (targetType ~= "Sleeper")
+                    local skelColor = currentSettings.SkeletonColor or Color3.fromRGB(255, 255, 255)
+                    for _, bone in ipairs(skeletonLines) do
+                        bone.Visible = showSkeleton
+                        bone.BackgroundColor3 = skelColor
+                    end
 
                     applyPose()
                     updateCamera()
