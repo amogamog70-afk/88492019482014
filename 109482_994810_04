@@ -3786,6 +3786,19 @@ end
 
             -- 1. Add Toggle (Classic square switch with selective Keybind/Modes)
             function Column:AddToggle(toggleName, defaultState, arg3, arg4)
+                local initialColor = nil
+                local colorCallback = nil
+                if type(toggleName) == "table" then
+                    local cfg = toggleName
+                    toggleName = cfg.Name or "Toggle"
+                    defaultState = cfg.Default ~= nil and cfg.Default or false
+                    arg3 = cfg.Callback
+                    if cfg.Color then
+                        initialColor = cfg.Color
+                        colorCallback = cfg.ColorCallback
+                    end
+                end
+
                 local callback = nil
                 local hasKeybind = false
                 local defaultKey = nil
@@ -4065,6 +4078,10 @@ end
                     set = function(v) toggleObj:Set(v) end
                 }
 
+                if initialColor then
+                    toggleObj:AddColorpicker(initialColor, 1, colorCallback)
+                end
+
                 return toggleObj
             end
 
@@ -4157,6 +4174,16 @@ end
 
             -- 3. Add Slider (Custom precision slider with track, thumb, suffix, and editable text box)
             function Column:AddSlider(sliderName, min, max, defaultVal, arg5, arg6)
+                if type(sliderName) == "table" then
+                    local cfg = sliderName
+                    sliderName = cfg.Name or "Slider"
+                    min = cfg.Min or 0
+                    max = cfg.Max or 100
+                    defaultVal = cfg.Default or min
+                    arg5 = cfg.Suffix or ""
+                    arg6 = cfg.Callback
+                end
+
                 min = min or 0
                 max = max or 100
                 defaultVal = math.clamp(defaultVal or min, min, max)
@@ -4628,6 +4655,14 @@ end
 
             -- 6. Add Dropdown (Single Select)
             function Column:AddDropdown(dpName, optionsList, defaultVal, callback)
+                if type(dpName) == "table" then
+                    local cfg = dpName
+                    dpName = cfg.Name or "Dropdown"
+                    optionsList = cfg.Options or {}
+                    defaultVal = cfg.Default or optionsList[1] or "None"
+                    callback = cfg.Callback
+                end
+
                 optionsList = optionsList or {}
                 defaultVal = defaultVal or optionsList[1] or "None"
                 callback = callback or function() end
