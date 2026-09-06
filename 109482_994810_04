@@ -898,7 +898,7 @@ table.insert(clickableRegistry, {
             BackgroundColor3 = isHovered and Color3.fromRGB(36, 36, 44) or Color3.fromRGB(28, 28, 32)
         }):Play()
         TweenService:Create(ThreeDotsStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 44, 52)
+            Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(44, 44, 52)
         }):Play()
         TweenService:Create(ThreeDotsIcon, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
             TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 185, 200)
@@ -1136,7 +1136,7 @@ table.insert(clickableRegistry, {
                 TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 225, 235)
             }):Play()
             TweenService:Create(ToggleStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(50, 54, 66)
+                Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(50, 54, 66)
             }):Play()
         end
     end
@@ -1155,7 +1155,7 @@ table.insert(clickableRegistry, {
                 TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 225, 235)
             }):Play()
             TweenService:Create(KeybindsToggleStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(50, 54, 66)
+                Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(50, 54, 66)
             }):Play()
         end
     end
@@ -1255,7 +1255,7 @@ table.insert(clickableRegistry, {
             }):Play()
             if not isListeningMenuKey then
                 TweenService:Create(KeybindBadgeStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                    Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 44, 52)
+                    Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(44, 44, 52)
                 }):Play()
                 TweenService:Create(KeybindBadge, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
                     BackgroundColor3 = isHovered and Color3.fromRGB(34, 34, 42) or Color3.fromRGB(26, 26, 32)
@@ -1537,19 +1537,16 @@ local function isInside(x, y, obj)
     if x < pos.X or x > (pos.X + size.X) or y < pos.Y or y > (pos.Y + size.Y) then
         return false
     end
-    -- Check visibility AND clipping bounds of all ancestors up to ScreenGui (prevents hidden/scrolled elements from registering clicks)
     local curr = obj.Parent
-    while curr and curr ~= ScreenGui and curr ~= game do
-        if curr:IsA("GuiObject") then
-            if not curr.Visible then
+    while curr and curr:IsA("GuiObject") do
+        if not curr.Visible then
+            return false
+        end
+        if curr:IsA("ScrollingFrame") or curr.ClipsDescendants then
+            local cPos = curr.AbsolutePosition
+            local cSize = curr.AbsoluteSize
+            if x < cPos.X or x > (cPos.X + cSize.X) or y < cPos.Y or y > (cPos.Y + cSize.Y) then
                 return false
-            end
-            if curr.ClipsDescendants then
-                local cPos = curr.AbsolutePosition
-                local cSize = curr.AbsoluteSize
-                if x < cPos.X or x > (cPos.X + cSize.X) or y < cPos.Y or y > (cPos.Y + cSize.Y) then
-                    return false
-                end
             end
         end
         curr = curr.Parent
@@ -2751,9 +2748,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         local elapsed = now - (listenStartTick or 0)
 
         if ContextMenu.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local mPos = UserInputService:GetMouseLocation()
-            local cx = mPos.X
-            local cy = mPos.Y
+            local cx = input.Position.X
+            local cy = input.Position.Y
             for mName, mObj in pairs(modeButtons) do
                 if isInside(cx, cy, mObj.row) then
                     isListeningKeybind = false
@@ -2848,9 +2844,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        local mPos = UserInputService:GetMouseLocation()
-        local clickX = mPos.X
-        local clickY = mPos.Y
+        local clickX = input.Position.X
+        local clickY = input.Position.Y
 
         -- 0. Check if Watermark was clicked for dragging (Priority hit-test)
         if WatermarkFrame.Visible and watermarkEnabled and isInside(clickX, clickY, WatermarkFrame) then
@@ -2996,9 +2991,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             end
         end
     elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-        local mPos = UserInputService:GetMouseLocation()
-        local clickX = mPos.X
-        local clickY = mPos.Y
+        local clickX = input.Position.X
+        local clickY = input.Position.Y
 
         if ColorPicker.Window.Visible then
             ColorPicker.Close()
@@ -3137,9 +3131,8 @@ end)
 
 UserInputService.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement then
-        local mPos = UserInputService:GetMouseLocation()
-        local mx = mPos.X
-        local my = mPos.Y
+        local mx = input.Position.X
+        local my = input.Position.Y
 
         if activeGraphDrag then
             activeGraphDrag.update(mx, my)
@@ -3289,9 +3282,8 @@ UserInputService.InputChanged:Connect(function(input)
     elseif input.UserInputType == Enum.UserInputType.MouseWheel then
         -- Smooth Zero-GPE Mouse Wheel scrolling for Column cards
         local scrollDelta = input.Position.Z
-        local mPos = UserInputService:GetMouseLocation()
-        local mx = mPos.X
-        local my = mPos.Y
+        local mx = input.Position.X
+        local my = input.Position.Y
 
 
 
@@ -4208,8 +4200,15 @@ end
                 end
 
                 table.insert(clickableRegistry, {
-                    object = SwitchHitbox,
-                    onClick = function()
+                    object = Row,
+                    onClick = function(clickX, clickY)
+                        if swatchBtnRef and clickX and clickY and isInside(clickX, clickY, swatchBtnRef) then
+                            return
+                        end
+                        if KeybindBtn.Visible and clickX and clickY and isInside(clickX, clickY, KeybindBtn) then
+                            return
+                        end
+
                         if hasKeybind and mode == "always" then
                             setToggle(true)
                         else
@@ -4217,8 +4216,11 @@ end
                         end
                     end,
                     onHover = function(isHovered)
+                        TweenService:Create(Label, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(215, 220, 230)
+                        }):Play()
                         TweenService:Create(SwitchStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and (state and Color3.fromRGB(50, 205, 255) or Color3.fromRGB(80, 86, 106)) or Color3.fromRGB(50, 54, 66)
+                            Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(50, 54, 66)
                         }):Play()
                         if not state then
                             TweenService:Create(Switch, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
@@ -4242,22 +4244,15 @@ end
                     end,
                     onHover = function(isHovered)
                         if not isListeningKeybind or activeContextItem ~= thisRightClickItem then
-                            KeybindStroke.Color = isHovered and Color3.fromRGB(75, 85, 110) or Color3.fromRGB(44, 48, 62)
+                            KeybindStroke.Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(44, 48, 62)
                             KeybindBtn.BackgroundColor3 = isHovered and Color3.fromRGB(28, 30, 38) or Color3.fromRGB(22, 24, 30)
                         end
                     end
                 })
 
                 table.insert(clickableRegistry, {
-                    object = Row,
-                    onClick = function(clickX, clickY)
-                        if swatchBtnRef and clickX and clickY and isInside(clickX, clickY, swatchBtnRef) then
-                            return
-                        end
-                        if KeybindBtn.Visible and clickX and clickY and isInside(clickX, clickY, KeybindBtn) then
-                            return
-                        end
-
+                    object = SwitchHitbox,
+                    onClick = function()
                         if hasKeybind and mode == "always" then
                             setToggle(true)
                         else
@@ -4265,11 +4260,8 @@ end
                         end
                     end,
                     onHover = function(isHovered)
-                        TweenService:Create(Label, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(215, 220, 230)
-                        }):Play()
                         TweenService:Create(SwitchStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and (state and Color3.fromRGB(50, 205, 255) or Color3.fromRGB(80, 86, 106)) or Color3.fromRGB(50, 54, 66)
+                            Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(50, 54, 66)
                         }):Play()
                         if not state then
                             TweenService:Create(Switch, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
@@ -4398,7 +4390,7 @@ end
                             end,
                             onHover = function(isHovered)
                                 TweenService:Create(SwatchStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                                    Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
+                                    Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(44, 46, 56)
                                 }):Play()
                             end
                         })
@@ -4495,7 +4487,7 @@ end
                             BackgroundColor3 = isHovered and Color3.fromRGB(34, 34, 42) or Color3.fromRGB(26, 26, 32)
                         }):Play()
                         TweenService:Create(BtnStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
+                            Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(44, 46, 56)
                         }):Play()
                         TweenService:Create(BtnLabel, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
                             TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(225, 230, 240)
@@ -4761,10 +4753,10 @@ end
                     onClick = function() end,
                     onHover = function(isHovered)
                         TweenService:Create(TrackStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
+                            Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(44, 46, 56)
                         }):Play()
                         TweenService:Create(ThumbStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and Color3.fromRGB(85, 92, 114) or Color3.fromRGB(60, 64, 76)
+                            Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(60, 64, 76)
                         }):Play()
                     end
                 })
@@ -4784,7 +4776,7 @@ end
                             BackgroundColor3 = isHovered and Color3.fromRGB(26, 26, 32) or Color3.fromRGB(20, 20, 24)
                         }):Play()
                         TweenService:Create(ValBoxStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(42, 46, 56)
+                            Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(42, 46, 56)
                         }):Play()
                     end
                 })
@@ -4899,7 +4891,7 @@ end
                             BackgroundColor3 = isHovered and Color3.fromRGB(30, 30, 36) or Color3.fromRGB(24, 24, 28)
                         }):Play()
                         TweenService:Create(BoxStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
+                            Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(44, 46, 56)
                         }):Play()
                         TweenService:Create(Label, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
                             TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(215, 220, 230)
@@ -4996,7 +4988,7 @@ end
                             TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(215, 220, 230)
                         }):Play()
                         TweenService:Create(SwatchStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
+                            Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(44, 46, 56)
                         }):Play()
                     end
                 })
@@ -5121,7 +5113,7 @@ end
                             BackgroundColor3 = isHovered and Color3.fromRGB(30, 30, 36) or Color3.fromRGB(24, 24, 28)
                         }):Play()
                         TweenService:Create(BoxStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
+                            Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(44, 46, 56)
                         }):Play()
                         TweenService:Create(Arrow, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
                             TextColor3 = isHovered and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(140, 145, 160)
@@ -5286,7 +5278,7 @@ end
                             BackgroundColor3 = isHovered and Color3.fromRGB(30, 30, 36) or Color3.fromRGB(24, 24, 28)
                         }):Play()
                         TweenService:Create(BoxStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
+                            Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(44, 46, 56)
                         }):Play()
                         TweenService:Create(Arrow, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
                             TextColor3 = isHovered and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(140, 145, 160)
@@ -5870,7 +5862,7 @@ end
                     end,
                     onHover = function(isHov)
                         TweenService:Create(cStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHov and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(40, 42, 52)
+                            Color = isHov and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(40, 42, 52)
                         }):Play()
                     end
                 })
