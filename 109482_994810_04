@@ -35,6 +35,12 @@ end
 local DeadHub = {}
 DeadHub.__index = DeadHub
 
+-- Centralized Registries (Linoria Architecture)
+DeadHub.Toggles = {}
+DeadHub.Options = {}
+DeadHub.Flags = {}
+DeadHub.Keybinds = {}
+
 -- Pre-configured Icons Dictionary (Direct asset IDs mapped by user)
 DeadHub.Icons = {
     Combat = "rbxassetid://125143421594685",
@@ -486,6 +492,71 @@ local sliderRegistry = {}
 local rightClickRegistry = {}
 local keybindItems = {}
 local configRegistry = {}
+local keybindRegistry = {}
+local inMemoryConfigs = {}
+
+-- Keybind & Input Helper Functions (Linoria Architecture & Bloxstrike Safe)
+local function formatKeyName(key)
+    if not key or key == "None" or key == "" then return "None" end
+    if key == Enum.UserInputType.MouseButton1 then return "MB1" end
+    if key == Enum.UserInputType.MouseButton2 then return "MB2" end
+    if key == Enum.UserInputType.MouseButton3 then return "MB3" end
+    if key == "WheelUp" then return "WheelUp" end
+    if key == "WheelDown" then return "WheelDown" end
+    if typeof(key) == "EnumItem" then
+        local n = key.Name
+        if n == "RightShift" then return "RShift" end
+        if n == "LeftShift" then return "LShift" end
+        if n == "RightControl" then return "RCtrl" end
+        if n == "LeftControl" then return "LCtrl" end
+        if n == "RightAlt" then return "RAlt" end
+        if n == "LeftAlt" then return "LAlt" end
+        if n == "CapsLock" then return "Caps" end
+        if n == "Backquote" then return "`" end
+        if n == "Minus" then return "-" end
+        if n == "Equals" then return "=" end
+        if n == "LeftBracket" then return "[" end
+        if n == "RightBracket" then return "]" end
+        if n == "BackSlash" then return "\\" end
+        if n == "Semicolon" then return ";" end
+        if n == "Quote" then return "'" end
+        if n == "Comma" then return "," end
+        if n == "Period" then return "." end
+        if n == "Slash" then return "/" end
+        if n == "PageUp" then return "PgUp" end
+        if n == "PageDown" then return "PgDn" end
+        if n == "Delete" then return "Del" end
+        if n == "Insert" then return "Ins" end
+        return n
+    end
+    return tostring(key)
+end
+
+local function formatKeyBadge(key)
+    local n = formatKeyName(key)
+    if n == "None" then return "[-]" end
+    return "[" .. n .. "]"
+end
+
+local function isKeyPhysicallyDown(key)
+    if not key then return false end
+    if key == Enum.UserInputType.MouseButton1 or key == Enum.UserInputType.MouseButton2 or key == Enum.UserInputType.MouseButton3 then
+        return UserInputService:IsMouseButtonPressed(key)
+    elseif typeof(key) == "EnumItem" and key.EnumType == Enum.KeyCode then
+        return UserInputService:IsKeyDown(key)
+    end
+    return false
+end
+
+local function isTyping()
+    if UserInputService:GetFocusedTextBox() ~= nil then
+        return true
+    end
+    if GuiService.MenuIsOpen then
+        return true
+    end
+    return false
+end
 
 local function updateKeybindsLayout()
     local hasItems = next(keybindItems) ~= nil
@@ -526,16 +597,19 @@ local function addKeybindEntry(id, name, mode, isActive, keyName)
     modeBadge.BackgroundTransparency = 1
     modeBadge.Font = ThemeFontBold
 
+    local m = string.lower(mode or "toggle")
     local badgeText = ""
-    if keyName and keyName ~= "" and keyName ~= "None" then
-        badgeText = "[" .. keyName .. " | " .. string.lower(mode) .. "]"
+    if m == "always" then
+        badgeText = "[always]"
+    elseif keyName and keyName ~= "" and keyName ~= "None" then
+        badgeText = "[" .. keyName .. " | " .. m .. "]"
     else
-        badgeText = "[" .. string.lower(mode) .. "]"
+        badgeText = "[" .. m .. "]"
     end
 
     modeBadge.Text = badgeText
     modeBadge.TextSize = 11
-    modeBadge.TextColor3 = isActive and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(120, 125, 140)
+    modeBadge.TextColor3 = (isActive or m == "always") and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(120, 125, 140)
     modeBadge.TextXAlignment = Enum.TextXAlignment.Right
     modeBadge.TextYAlignment = Enum.TextYAlignment.Center
     modeBadge.ZIndex = 103
@@ -547,11 +621,17 @@ local function addKeybindEntry(id, name, mode, isActive, keyName)
         onClick = function()
             local now = tick()
             if (now - lastKbRowClick) < 0.35 then
-                -- Double-click on keybind widget row removes the keybind
+                -- Double-click on keybind widget row removes or resets the keybind
                 lastKbRowClick = 0
                 for _, t in ipairs(rightClickRegistry) do
                     if t.id == id and t.resetKeybind then
                         t.resetKeybind()
+                        break
+                    end
+                end
+                for _, kb in ipairs(keybindRegistry) do
+                    if kb.id == id and kb.resetKeybind then
+                        kb.resetKeybind()
                         break
                     end
                 end
@@ -562,7 +642,7 @@ local function addKeybindEntry(id, name, mode, isActive, keyName)
         end
     })
 
-    keybindItems[id] = {frame = row, nameLbl = nameLbl, modeBadge = modeBadge, keyName = keyName}
+    keybindItems[id] = {frame = row, nameLbl = nameLbl, modeBadge = modeBadge, keyName = keyName, mode = mode}
     updateKeybindsLayout()
     return row
 end
@@ -2715,16 +2795,7 @@ local function updateContextMenuUI()
         TweenService:Create(CtxKeybindStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Color = Color3.fromRGB(230, 57, 70)}):Play()
     else
         local k = activeContextItem.getKey()
-        local kName = "None"
-        if k then
-            if k == Enum.UserInputType.MouseButton1 then kName = "Mouse1"
-            elseif k == Enum.UserInputType.MouseButton2 then kName = "Mouse2"
-            elseif k == Enum.UserInputType.MouseButton3 then kName = "Mouse3"
-            elseif k == "WheelUp" then kName = "WheelUp"
-            elseif k == "WheelDown" then kName = "WheelDown"
-            else kName = tostring(k.Name or k)
-            end
-        end
+        local kName = formatKeyName(k)
         CtxKeybindText.Text = "Key: [ " .. kName .. " ]"
         CtxKeybindText.TextColor3 = Color3.fromRGB(215, 220, 235)
         TweenService:Create(CtxKeybindStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Color = Color3.fromRGB(42, 46, 58)}):Play()
@@ -2761,113 +2832,116 @@ local function openContextMenuForItem(item)
     ContextMenu.Visible = true
 end
 
--- Unified single InputBegan handler: processes clicks, context menus, and bound key triggers
+-- Unified single InputBegan handler (Linoria Architecture & Bloxstrike Safe)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if isListeningKeybind and activeContextItem then
-        local now = tick()
-        local elapsed = now - (listenStartTick or 0)
-
-        if ContextMenu.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local cx = input.Position.X
-            local cy = input.Position.Y
-            for mName, mObj in pairs(modeButtons) do
-                if isInside(cx, cy, mObj.row) then
-                    isListeningKeybind = false
-                    activeContextItem.setMode(mName)
-                    updateContextMenuUI()
-                    return
-                end
-            end
-            if isInside(cx, cy, CtxKeybindRow) and elapsed < 0.2 then
-                return
-            end
+    -- 0. Check Menu Toggle Key (RightShift, Insert, or custom menuKey)
+    -- Must work regardless of menuOpen or gameProcessed (unless typing in textbox)
+    local isMenuToggle = false
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        if (menuKey and input.KeyCode == menuKey) or input.KeyCode == Enum.KeyCode.Insert then
+            isMenuToggle = true
         end
-
-        if elapsed >= 0.12 then
-            local bound = nil
-            local cancelled = false
-            local cleared = false
-
-            if input.UserInputType == Enum.UserInputType.Keyboard then
-                if input.KeyCode == Enum.KeyCode.Escape then
-                    cancelled = true
-                elseif input.KeyCode == Enum.KeyCode.Backspace or input.KeyCode == Enum.KeyCode.Delete then
-                    cleared = true
-                elseif input.KeyCode ~= Enum.KeyCode.Unknown then
-                    bound = input.KeyCode
-                end
-            elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-                bound = Enum.UserInputType.MouseButton1
-            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-                bound = Enum.UserInputType.MouseButton2
-            elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
-                bound = Enum.UserInputType.MouseButton3
-            elseif input.UserInputType == Enum.UserInputType.MouseWheel then
-                if input.Position.Z > 0 then
-                    bound = "WheelUp"
-                elseif input.Position.Z < 0 then
-                    bound = "WheelDown"
-                end
-            end
-
-            if cancelled then
-                isListeningKeybind = false
-                updateContextMenuUI()
-                return
-            elseif cleared then
-                activeContextItem.setKey(nil)
-                isListeningKeybind = false
-                updateContextMenuUI()
-                return
-            elseif bound ~= nil then
-                activeContextItem.setKey(bound)
-                isListeningKeybind = false
-                updateContextMenuUI()
-                return
-            end
-        else
+    end
+    if isMenuToggle then
+        if not isTyping() then
+            toggleMenu()
             return
         end
     end
 
-    if not menuOpen then
-        for _, item in ipairs(rightClickRegistry) do
-            local k = item.getKey()
-            local matches = false
-            if k then
-                if type(k) == "string" then
-                    if k == "WheelUp" and input.UserInputType == Enum.UserInputType.MouseWheel and input.Position.Z > 0 then
-                        matches = true
-                    elseif k == "WheelDown" and input.UserInputType == Enum.UserInputType.MouseWheel and input.Position.Z < 0 then
-                        matches = true
-                    end
-                elseif input.KeyCode == k or input.UserInputType == k then
-                    matches = true
+    -- 1. Listening for custom Menu Key (Settings popup)
+    if isListeningMenuKey then
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            pcall(function()
+                if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.Backspace then
+                    menuKey = nil
+                elseif input.KeyCode ~= Enum.KeyCode.Unknown then
+                    menuKey = input.KeyCode
                 end
-            end
-            if matches then
-                local m = (item.getMode() or "toggle"):lower()
-                if m == "toggle" then
-                    item.toggle()
-                elseif m == "hold" then
-                    item.set(true)
-                    if type(k) == "string" and (k == "WheelUp" or k == "WheelDown") then
-                        task.delay(0.2, function()
-                            if (item.getMode() or "toggle"):lower() == "hold" then
-                                item.set(false)
-                            end
-                        end)
-                    end
-                end
-            end
+            end)
+            isListeningMenuKey = false
+            updateMenuKeyUI()
+            return
         end
     end
 
+    -- 2. Listening for Keybind in ContextMenu Modal
+    if isListeningKeybind and activeContextItem then
+        local cancelled = false
+        local cleared = false
+        local bound = nil
+
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            if input.KeyCode == Enum.KeyCode.Escape then
+                cancelled = true
+            elseif input.KeyCode == Enum.KeyCode.Backspace or input.KeyCode == Enum.KeyCode.Delete then
+                cleared = true
+            elseif input.KeyCode ~= Enum.KeyCode.Unknown then
+                bound = input.KeyCode
+            end
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+            bound = Enum.UserInputType.MouseButton2
+        elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+            bound = Enum.UserInputType.MouseButton3
+        elseif input.UserInputType == Enum.UserInputType.MouseWheel then
+            if input.Position.Z > 0 then
+                bound = "WheelUp"
+            elseif input.Position.Z < 0 then
+                bound = "WheelDown"
+            end
+        elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local cx = input.Position.X
+            local cy = input.Position.Y
+            if ContextMenu.Visible and isInside(cx, cy, ContextMenu) then
+                for mName, mObj in pairs(modeButtons) do
+                    if isInside(cx, cy, mObj.row) then
+                        isListeningKeybind = false
+                        activeContextItem.setMode(mName)
+                        updateContextMenuUI()
+                        return
+                    end
+                end
+                if isInside(cx, cy, CtxKeybindRow) then
+                    isListeningKeybind = false
+                    updateContextMenuUI()
+                    return
+                end
+                return
+            else
+                ContextMenu.Visible = false
+                isListeningKeybind = false
+                activeContextItem = nil
+                return
+            end
+        end
+
+        if cancelled then
+            isListeningKeybind = false
+            updateContextMenuUI()
+            return
+        elseif cleared then
+            if activeContextItem.resetKeybind then
+                activeContextItem.resetKeybind()
+            else
+                activeContextItem.setKey(nil)
+            end
+            isListeningKeybind = false
+            updateContextMenuUI()
+            return
+        elseif bound ~= nil then
+            activeContextItem.setKey(bound)
+            isListeningKeybind = false
+            updateContextMenuUI()
+            return
+        end
+    end
+
+    -- 3. MouseButton1 Clicks (UI Interactions & Hit-Tests)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         local clickX = input.Position.X
         local clickY = input.Position.Y
 
-        -- 0. Check if Watermark was clicked for dragging (Priority hit-test)
+        -- Priority 0: Watermark dragging
         if WatermarkFrame.Visible and watermarkEnabled and isInside(clickX, clickY, WatermarkFrame) then
             isDraggingWM = true
             wmDragStart = Vector2.new(clickX, clickY)
@@ -2877,7 +2951,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             return
         end
 
-        -- 1. Check if Keybinds widget was clicked for dragging (Priority hit-test)
+        -- Priority 1: Keybinds widget dragging
         if KeybindsFrame.Visible and keybindsEnabled and isInside(clickX, clickY, KeybindsFrame) then
             isDraggingKB = true
             kbDragStart = Vector2.new(clickX, clickY)
@@ -2887,22 +2961,21 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             return
         end
 
-        -- Priority hit-test: ColorPicker Window
+        -- Priority 2: ColorPicker Window
         if ColorPicker.Window.Visible then
             if ColorPicker.HandleClick(clickX, clickY) then
                 return
             end
         end
 
-        -- Priority hit-test: Dropdown & Multiselect Overlay
+        -- Priority 3: Dropdown & Multiselect Overlay
         if DropdownOverlay.IsVisible() then
             if DropdownOverlay.HandleClick(clickX, clickY) then
                 return
             end
         end
 
-        -- Priority hit-test: Context Menu Modal Overlay
-        -- While open, user can ONLY interact with Context Menu until closed!
+        -- Priority 4: Context Menu Modal Overlay
         if ContextMenu.Visible then
             if isInside(clickX, clickY, ContextMenu) then
                 if isInside(clickX, clickY, CtxKeybindRow) then
@@ -2943,9 +3016,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             end
         end
 
+        -- Priority 5: MainFrame interactions when menuOpen
         if MainFrame.Visible and menuOpen then
-
-            -- 2. Check Settings Popup clicks & outside dismissal
+            -- Settings popup
             if SettingsPopup and SettingsPopup.Visible then
                 if isInside(clickX, clickY, SettingsPopup) then
                     if isInside(clickX, clickY, WatermarkRow) then
@@ -2959,7 +3032,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                         updateMenuKeyUI()
                         return
                     end
-                    return -- Click was inside popup body/header, absorb to keep open
+                    return
                 else
                     SettingsPopup.Visible = false
                     if isListeningMenuKey then
@@ -2967,12 +3040,12 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                         updateMenuKeyUI()
                     end
                     if isInside(clickX, clickY, ThreeDotsBtn) then
-                        return -- If clicked 3 dots while open, close it and consume click
+                        return
                     end
                 end
             end
 
-            -- 3. Check if 3 Dots button was clicked (when popup was closed)
+            -- 3 dots button
             if isInside(clickX, clickY, ThreeDotsBtn) then
                 if SettingsPopup then
                     SettingsPopup.Visible = true
@@ -2980,7 +3053,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 return
             end
 
-            -- 5. Check if Header was clicked for dragging
+            -- Header dragging
             if isInside(clickX, clickY, Header) then
                 isDragging = true
                 dragStart = Vector2.new(clickX, clickY)
@@ -2990,7 +3063,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 return
             end
 
-            -- 6. Check Active Sliders
+            -- Active Sliders
             for _, s in ipairs(sliderRegistry) do
                 if s.hitbox and isInside(clickX, clickY, s.hitbox) then
                     activeSlider = s
@@ -2999,7 +3072,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 end
             end
 
-            -- 7. Check Clickable components in active Tab (Reverse order: child components like SwatchBtn take precedence over parent Row)
+            -- Clickable components (reverse order so inner buttons take priority)
             for i = #clickableRegistry, 1, -1 do
                 local item = clickableRegistry[i]
                 if item.object and isInside(clickX, clickY, item.object) then
@@ -3010,28 +3083,18 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 end
             end
         end
-    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+
+        return
+    end
+
+    -- 4. MouseButton2 (Right-Click Context Menu opener on elements)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
         local clickX = input.Position.X
         local clickY = input.Position.Y
 
-        if ColorPicker.Window.Visible then
-            ColorPicker.Close()
-            return
-        end
-
-        if DropdownOverlay.IsVisible() then
-            DropdownOverlay.Close()
-            return
-        end
-
-
-
-        if ContextMenu.Visible then
-            ContextMenu.Visible = false
-            isListeningKeybind = false
-            activeContextItem = nil
-            return
-        end
+        if ColorPicker.Window.Visible then ColorPicker.Close() end
+        if DropdownOverlay.IsVisible() then DropdownOverlay.Close() end
+        if SettingsPopup and SettingsPopup.Visible then SettingsPopup.Visible = false end
 
         if MainFrame.Visible and menuOpen then
             for _, item in ipairs(rightClickRegistry) do
@@ -3043,94 +3106,54 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                     return
                 end
             end
-        elseif not menuOpen and not gameProcessed then
-            for _, item in ipairs(rightClickRegistry) do
-                local k = item.getKey()
-                if k and k == Enum.UserInputType.MouseButton2 then
-                    local m = (item.getMode() or "toggle"):lower()
-                    if m == "toggle" then
-                        item.toggle()
-                    elseif m == "hold" then
-                        item.set(true)
-                    end
+            for _, kb in ipairs(keybindRegistry) do
+                local isHit = (kb.keybindBtn and kb.keybindBtn.Visible and isInside(clickX, clickY, kb.keybindBtn))
+                    or (kb.row and isInside(clickX, clickY, kb.row))
+                if isHit then
+                    openContextMenuForItem(kb)
+                    return
                 end
             end
         end
+    end
 
-        if ColorPicker.Window.Visible then
-            ColorPicker.Close()
-        end
+    -- 5. Central Keybinds Dispatch Engine (Linoria Architecture & Bloxstrike Safe)
+    -- If user is typing in chat/textbox or Roblox system menu is open, DO NOT trigger keybinds!
+    if isTyping() then
+        return
+    end
 
-        if SettingsPopup and SettingsPopup.Visible then
-            SettingsPopup.Visible = false
-            if isListeningMenuKey then
-                isListeningMenuKey = false
-                updateMenuKeyUI()
-            end
-        end
-
-        if ContextMenu.Visible then
-            ContextMenu.Visible = false
-            isListeningKeybind = false
-            activeContextItem = nil
-        end
-    elseif not gameProcessed then
-        if isListeningMenuKey then
-            if input.UserInputType == Enum.UserInputType.Keyboard then
-                pcall(function()
-                    if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.Backspace then
-                        menuKey = nil
-                    elseif input.KeyCode ~= Enum.KeyCode.Unknown then
-                        menuKey = input.KeyCode
-                    end
-                end)
-                isListeningMenuKey = false
-                updateMenuKeyUI()
-                return
-            end
-        end
-
-        if isListeningKeybind and activeContextItem then
-            local bound = nil
-            local cancelled = false
-            if input.UserInputType == Enum.UserInputType.Keyboard then
-                if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.Backspace then
-                    cancelled = true
-                elseif input.KeyCode ~= Enum.KeyCode.Unknown then
-                    bound = input.KeyCode
+    -- Dispatch input to all registered keybinds (Single execution, no double toggles, works in Bloxstrike!)
+    for _, item in ipairs(keybindRegistry) do
+        local k = item.getKey()
+        local matches = false
+        if k then
+            if type(k) == "string" then
+                if k == "WheelUp" and input.UserInputType == Enum.UserInputType.MouseWheel and input.Position.Z > 0 then
+                    matches = true
+                elseif k == "WheelDown" and input.UserInputType == Enum.UserInputType.MouseWheel and input.Position.Z < 0 then
+                    matches = true
                 end
-            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-                bound = Enum.UserInputType.MouseButton2
-            elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
-                bound = Enum.UserInputType.MouseButton3
-            end
-
-            if cancelled then
-                activeContextItem.setKey(nil)
-                isListeningKeybind = false
-                updateContextMenuUI()
-                return
-            elseif bound ~= nil then
-                activeContextItem.setKey(bound)
-                isListeningKeybind = false
-                updateContextMenuUI()
-                return
+            elseif input.KeyCode == k or input.UserInputType == k then
+                matches = true
             end
         end
 
-        if (menuKey and input.KeyCode == menuKey) or input.KeyCode == Enum.KeyCode.Insert then
-            toggleMenu()
-        else
-            for _, item in ipairs(rightClickRegistry) do
-                local k = item.getKey()
-                if k and (input.KeyCode == k or input.UserInputType == k) then
-                    local m = (item.getMode() or "toggle"):lower()
-                    if m == "toggle" then
-                        item.toggle()
-                    elseif m == "hold" then
-                        item.set(true)
-                    end
+        if matches then
+            local m = (item.getMode() or "toggle"):lower()
+            if m == "toggle" then
+                item.toggle()
+            elseif m == "hold" then
+                item.set(true)
+                if type(k) == "string" and (k == "WheelUp" or k == "WheelDown") then
+                    task.delay(0.2, function()
+                        if (item.getMode() or "toggle"):lower() == "hold" then
+                            item.set(false)
+                        end
+                    end)
                 end
+            elseif m == "always" then
+                item.set(true)
             end
         end
     end
@@ -3335,7 +3358,7 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
         end
     end
 
-    for _, item in ipairs(rightClickRegistry) do
+    for _, item in ipairs(keybindRegistry) do
         local k = item.getKey()
         local matches = false
         if k then
@@ -3381,6 +3404,33 @@ local headerStatsTimer = 0
 
 -- RenderStepped: Handles Watermark Stats update (0.5s), Snappy & Smooth Dragging, and Background Tool Protection
 RunService.RenderStepped:Connect(function(dt)
+    -- Bloxstrike & FPS games: Keep cursor free and unlocked while menu is open
+    if menuOpen then
+        pcall(function()
+            if UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
+                UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+            end
+            UserInputService.MouseIconEnabled = true
+        end)
+    end
+
+    -- Keybinds Physical State Watchdog: Prevents stuck hold keys & maintains always-mode
+    for _, item in ipairs(keybindRegistry) do
+        local mode = (item.getMode() or "toggle"):lower()
+        if mode == "always" then
+            if not item.getActive() then
+                item.set(true)
+            end
+        elseif mode == "hold" then
+            if item.getActive() then
+                local k = item.getKey()
+                if not isKeyPhysicallyDown(k) then
+                    item.set(false)
+                end
+            end
+        end
+    end
+
     -- 0. Header Live Metrics (Session Playtime & Client RAM)
     headerStatsTimer = headerStatsTimer + dt
     if headerStatsTimer >= 0.5 then
@@ -3523,18 +3573,161 @@ end
     Window.MainFrame = MainFrame
     Window.Watermark = WatermarkFrame
     Window.Keybinds = KeybindsFrame
+    Window.KeybindFrame = KeybindsFrame
+    Window.Toggles = DeadHub.Toggles
+    Window.Options = DeadHub.Options
+    Window.Flags = DeadHub.Flags
+
     Window.ConfigManager = {
         Open = function() end,
         Close = function() end,
-        Save = function() end,
-        Load = function() end,
-        Delete = function() end,
+        Save = function(self, name) return Window:SaveConfig(name) end,
+        Load = function(self, name) return Window:LoadConfig(name) end,
+        Delete = function(self, name) return Window:DeleteConfig(name) end,
+        GetConfigs = function(self) return Window:GetConfigs() end,
         IsVisible = function() return false end
     }
 
-    function Window:SaveConfig(name) end
-    function Window:LoadConfig(name) end
-    function Window:DeleteConfig(name) end
+    function Window:SaveConfig(name)
+        if not name or name == "" then return false end
+        local data = {}
+        for k, item in pairs(configRegistry) do
+            pcall(function()
+                data[k] = item.get()
+            end)
+        end
+        data["_Keybinds"] = {}
+        for _, kb in ipairs(keybindRegistry) do
+            pcall(function()
+                local kVal = kb.getKey()
+                local kName = nil
+                if typeof(kVal) == "EnumItem" then
+                    kName = { type = tostring(kVal.EnumType), name = kVal.Name }
+                elseif type(kVal) == "string" then
+                    kName = { type = "string", name = kVal }
+                end
+                data["_Keybinds"][kb.id] = {
+                    key = kName,
+                    mode = kb.getMode()
+                }
+            end)
+        end
+        local success, json = pcall(function()
+            return HttpService:JSONEncode(data)
+        end)
+        if not success then return false end
+
+        local saved = false
+        if writefile then
+            pcall(function()
+                if isfolder and not isfolder("DeadHub") then makefolder("DeadHub") end
+                if isfolder and not isfolder("DeadHub/Configs") then makefolder("DeadHub/Configs") end
+                writefile("DeadHub/Configs/" .. tostring(name) .. ".json", json)
+                saved = true
+            end)
+        end
+        if not saved then
+            inMemoryConfigs[name] = json
+        end
+        return true
+    end
+
+    function Window:LoadConfig(name)
+        if not name or name == "" then return false end
+        local json = nil
+        if readfile then
+            pcall(function()
+                if isfile and isfile("DeadHub/Configs/" .. tostring(name) .. ".json") then
+                    json = readfile("DeadHub/Configs/" .. tostring(name) .. ".json")
+                elseif isfile and isfile("DeadHub/Configs/" .. tostring(name)) then
+                    json = readfile("DeadHub/Configs/" .. tostring(name))
+                end
+            end)
+        end
+        if not json and inMemoryConfigs[name] then
+            json = inMemoryConfigs[name]
+        end
+        if not json then return false end
+
+        local success, data = pcall(function()
+            return HttpService:JSONDecode(json)
+        end)
+        if not success or type(data) ~= "table" then return false end
+
+        for k, val in pairs(data) do
+            if k ~= "_Keybinds" and configRegistry[k] and configRegistry[k].set then
+                pcall(function()
+                    configRegistry[k].set(val)
+                end)
+            end
+        end
+
+        if type(data["_Keybinds"]) == "table" then
+            for kbId, kbData in pairs(data["_Keybinds"]) do
+                for _, kb in ipairs(keybindRegistry) do
+                    if kb.id == kbId then
+                        pcall(function()
+                            if kbData.mode then kb.setMode(kbData.mode) end
+                            if kbData.key then
+                                if kbData.key.type == "Enum.KeyCode" then
+                                    kb.setKey(Enum.KeyCode[kbData.key.name])
+                                elseif kbData.key.type == "Enum.UserInputType" then
+                                    kb.setKey(Enum.UserInputType[kbData.key.name])
+                                elseif kbData.key.type == "string" then
+                                    kb.setKey(kbData.key.name)
+                                end
+                            else
+                                kb.setKey(nil)
+                            end
+                        end)
+                        break
+                    end
+                end
+            end
+        end
+        return true
+    end
+
+    function Window:DeleteConfig(name)
+        if not name or name == "" then return false end
+        local deleted = false
+        if delfile then
+            pcall(function()
+                if isfile and isfile("DeadHub/Configs/" .. tostring(name) .. ".json") then
+                    delfile("DeadHub/Configs/" .. tostring(name) .. ".json")
+                    deleted = true
+                end
+            end)
+        end
+        if inMemoryConfigs[name] then
+            inMemoryConfigs[name] = nil
+            deleted = true
+        end
+        return deleted
+    end
+
+    function Window:GetConfigs()
+        local list = {}
+        if listfiles then
+            pcall(function()
+                if isfolder and isfolder("DeadHub/Configs") then
+                    for _, f in ipairs(listfiles("DeadHub/Configs")) do
+                        local clean = f:gsub("DeadHub/Configs/", ""):gsub("%.json$", ""):gsub("\\", "/")
+                        clean = clean:match("([^/]+)$") or clean
+                        table.insert(list, clean)
+                    end
+                end
+            end)
+        end
+        for k, _ in pairs(inMemoryConfigs) do
+            local found = false
+            for _, item in ipairs(list) do
+                if item == k then found = true break end
+            end
+            if not found then table.insert(list, k) end
+        end
+        return list
+    end
 
     function Window:SetTitle(newTitle)
         windowTitle = tostring(newTitle)
@@ -3560,11 +3753,14 @@ end
     end
 
     function Window:SetKeybind(id, name, mode, isActive, keyName)
+        local m = string.lower(mode or "toggle")
         local badgeText = ""
-        if keyName and keyName ~= "" and keyName ~= "None" then
-            badgeText = "[" .. keyName .. " | " .. string.lower(mode) .. "]"
+        if m == "always" then
+            badgeText = "[always]"
+        elseif keyName and keyName ~= "" and keyName ~= "None" then
+            badgeText = "[" .. keyName .. " | " .. m .. "]"
         else
-            badgeText = "[" .. string.lower(mode) .. "]"
+            badgeText = "[" .. m .. "]"
         end
 
         if not keybindItems[id] then
@@ -3572,8 +3768,9 @@ end
         else
             keybindItems[id].nameLbl.Text = name
             keybindItems[id].modeBadge.Text = badgeText
-            keybindItems[id].modeBadge.TextColor3 = isActive and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(120, 125, 140)
+            keybindItems[id].modeBadge.TextColor3 = (isActive or m == "always") and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(120, 125, 140)
             keybindItems[id].keyName = keyName
+            keybindItems[id].mode = mode
         end
     end
 
@@ -3944,7 +4141,7 @@ end
                 return ColContent
             end
 
-            -- 1. Add Toggle (Classic square switch with selective Keybind/Modes)
+            -- 1. Add Toggle (Classic square switch with Linoria KeyPicker / Keybind architecture)
             function Column:AddToggle(toggleName, defaultState, arg3, arg4)
                 local initialColor = nil
                 local colorCallback = nil
@@ -3954,17 +4151,18 @@ end
 
                 if type(toggleName) == "table" then
                     local cfg = toggleName
-                    toggleName = cfg.Name or "Toggle"
+                    toggleName = cfg.Name or cfg.Text or "Toggle"
                     defaultState = cfg.Default ~= nil and cfg.Default or false
                     arg3 = cfg.Callback or cfg.callback
                     if cfg.Color then
                         initialColor = cfg.Color
                         colorCallback = cfg.ColorCallback
                     end
-                    if cfg.Keybind then
+                    if cfg.Keybind or cfg.KeyPicker then
                         hasKeybind = true
-                        defaultKey = cfg.Key or cfg.DefaultKey
-                        initialMode = cfg.Mode or "toggle"
+                        local kbCfg = type(cfg.Keybind) == "table" and cfg.Keybind or (type(cfg.KeyPicker) == "table" and cfg.KeyPicker or {})
+                        defaultKey = kbCfg.Default or kbCfg.Key or cfg.Key or cfg.DefaultKey
+                        initialMode = kbCfg.Mode or cfg.Mode or "toggle"
                     end
                 end
 
@@ -3976,12 +4174,12 @@ end
                         hasKeybind = arg4
                     elseif type(arg4) == "table" then
                         hasKeybind = true
-                        defaultKey = arg4.Key or arg4.DefaultKey
+                        defaultKey = arg4.Default or arg4.Key or arg4.DefaultKey
                         initialMode = arg4.Mode or "toggle"
                     end
                 elseif type(arg3) == "table" then
                     hasKeybind = arg3.Keybind ~= false
-                    defaultKey = arg3.Key or arg3.DefaultKey
+                    defaultKey = arg3.Default or arg3.Key or arg3.DefaultKey
                     initialMode = arg3.Mode or "toggle"
                     callback = arg4 or function() end
                 elseif type(arg3) == "boolean" then
@@ -3992,10 +4190,11 @@ end
                 end
 
                 local state = defaultState == true
-                local mode = initialMode
+                local mode = (initialMode or "toggle"):lower()
                 local boundKey = defaultKey
                 local toggleId = "toggle_" .. toggleName:gsub("%s+", "_"):lower()
                 local swatchBtnRef = nil
+                local changedCallbacks = {}
 
                 local Row = Instance.new("Frame")
                 Row.Name = "ToggleRow_" .. toggleName
@@ -4098,39 +4297,6 @@ end
                 KnobCorner.CornerRadius = UDim.new(0, 3)
                 KnobCorner.Parent = Knob
 
-                local function formatKeyLabel(k)
-                    if not k then return "[-]" end
-                    if k == Enum.UserInputType.MouseButton1 then return "[M1]" end
-                    if k == Enum.UserInputType.MouseButton2 then return "[M2]" end
-                    if k == Enum.UserInputType.MouseButton3 then return "[M3]" end
-                    if k == "WheelUp" then return "[WUp]" end
-                    if k == "WheelDown" then return "[WDn]" end
-                    local n = tostring(k.Name or k)
-                    if n == "RightShift" then return "[RShift]" end
-                    if n == "LeftShift" then return "[LShift]" end
-                    if n == "RightControl" then return "[RCtrl]" end
-                    if n == "LeftControl" then return "[LCtrl]" end
-                    if n == "RightAlt" then return "[RAlt]" end
-                    if n == "LeftAlt" then return "[LAlt]" end
-                    if n == "CapsLock" then return "[Caps]" end
-                    if n == "Backquote" then return "[`]" end
-                    if n == "Minus" then return "[-]" end
-                    if n == "Equals" then return "[=]" end
-                    if n == "LeftBracket" then return "[[]" end
-                    if n == "RightBracket" then return "[]]" end
-                    if n == "BackSlash" then return "[\\]" end
-                    if n == "Semicolon" then return "[;]" end
-                    if n == "Quote" then return "[']" end
-                    if n == "Comma" then return "[,]" end
-                    if n == "Period" then return "[.]" end
-                    if n == "Slash" then return "[/]" end
-                    if n == "PageUp" then return "[PgUp]" end
-                    if n == "PageDown" then return "[PgDn]" end
-                    if n == "Delete" then return "[Del]" end
-                    if n == "Insert" then return "[Ins]" end
-                    return "[" .. n .. "]"
-                end
-
                 local thisRightClickItem = nil
 
                 local function updateKeybindDisplay()
@@ -4162,19 +4328,12 @@ end
                         KeybindText.TextColor3 = Color3.fromRGB(230, 57, 70)
                         KeybindStroke.Color = Color3.fromRGB(230, 57, 70)
                     else
-                        KeybindText.Text = formatKeyLabel(boundKey)
+                        KeybindText.Text = formatKeyBadge(boundKey)
                         KeybindText.TextColor3 = (mode == "always" or boundKey ~= nil) and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(150, 155, 175)
                         KeybindStroke.Color = Color3.fromRGB(44, 48, 62)
                     end
 
-                    local keyName = boundKey and (boundKey.Name or tostring(boundKey)) or nil
-                    if boundKey == Enum.UserInputType.MouseButton2 then keyName = "Mouse2"
-                    elseif boundKey == Enum.UserInputType.MouseButton1 then keyName = "Mouse1"
-                    elseif boundKey == Enum.UserInputType.MouseButton3 then keyName = "Mouse3"
-                    elseif boundKey == "WheelUp" then keyName = "WheelUp"
-                    elseif boundKey == "WheelDown" then keyName = "WheelDown"
-                    end
-
+                    local keyName = formatKeyName(boundKey)
                     if mode == "always" then
                         Window:SetKeybind(toggleId, toggleName, "always", true, keyName)
                     elseif boundKey ~= nil then
@@ -4194,15 +4353,22 @@ end
                 end
 
                 local function setToggle(newState)
-                    state = newState
+                    state = (newState == true)
+                    DeadHub.Flags[toggleName] = state
+                    Window.Flags[toggleName] = state
+
                     local targetColor = state and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(28, 28, 34)
                     local targetKnobPos = state and UDim2.new(0, 18, 0, 2) or UDim2.new(0, 2, 0, 2)
                     TweenService:Create(Switch, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = targetColor}):Play()
                     TweenService:Create(Knob, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetKnobPos}):Play()
                     updateKeybindDisplay()
+
                     local ok, err = pcall(callback, state)
                     if not ok and err then
                         warn("[DeadHub Toggle Error]: " .. tostring(err))
+                    end
+                    for _, cb in ipairs(changedCallbacks) do
+                        pcall(cb, state)
                     end
                 end
 
@@ -4213,11 +4379,6 @@ end
                             return
                         end
                         if KeybindBtn.Visible and clickX and clickY and isInside(clickX, clickY, KeybindBtn) then
-                            return
-                        end
-
-                        if hasKeybind and boundKey ~= nil and mode == "hold" then
-                            openContextMenuForItem(thisRightClickItem)
                             return
                         end
 
@@ -4271,19 +4432,13 @@ end
                     name = toggleName,
                     resetKeybind = resetKeybind,
                     getMode = function() return mode end,
+                    getActive = function() return (mode == "always" or state) end,
                     setMode = function(newMode)
-                        mode = newMode
+                        mode = (newMode or "toggle"):lower()
                         if mode == "always" then
                             setToggle(true)
                         elseif mode == "hold" then
-                            local isHeld = false
-                            if boundKey then
-                                if boundKey == Enum.UserInputType.MouseButton1 or boundKey == Enum.UserInputType.MouseButton2 or boundKey == Enum.UserInputType.MouseButton3 then
-                                    isHeld = UserInputService:IsMouseButtonPressed(boundKey)
-                                elseif typeof(boundKey) == "EnumItem" and boundKey.EnumType == Enum.KeyCode then
-                                    isHeld = UserInputService:IsKeyDown(boundKey)
-                                end
-                            end
+                            local isHeld = isKeyPhysicallyDown(boundKey)
                             setToggle(isHeld)
                         end
                         updateKeybindDisplay()
@@ -4293,14 +4448,7 @@ end
                         boundKey = newKey
                         hasKeybind = (boundKey ~= nil or mode == "always")
                         if mode == "hold" then
-                            local isHeld = false
-                            if boundKey then
-                                if boundKey == Enum.UserInputType.MouseButton1 or boundKey == Enum.UserInputType.MouseButton2 or boundKey == Enum.UserInputType.MouseButton3 then
-                                    isHeld = UserInputService:IsMouseButtonPressed(boundKey)
-                                elseif typeof(boundKey) == "EnumItem" and boundKey.EnumType == Enum.KeyCode then
-                                    isHeld = UserInputService:IsKeyDown(boundKey)
-                                end
-                            end
+                            local isHeld = isKeyPhysicallyDown(boundKey)
                             setToggle(isHeld)
                         end
                         updateKeybindDisplay()
@@ -4311,18 +4459,23 @@ end
                         end
                     end,
                     set = function(val)
-                        if mode ~= "always" then
+                        if mode == "always" then
+                            setToggle(true)
+                        else
                             setToggle(val)
                         end
                     end
                 }
                 table.insert(rightClickRegistry, thisRightClickItem)
+                table.insert(keybindRegistry, thisRightClickItem)
 
                 if hasKeybind then
                     updateKeybindDisplay()
                 end
 
                 local toggleObj = {
+                    Type = "Toggle",
+                    Value = state,
                     Row = Row,
                     SetVisible = function(self, vis)
                         Row.Visible = (vis == true)
@@ -4331,22 +4484,58 @@ end
                         return Row.Visible
                     end,
                     Set = function(self, val) setToggle(val) end,
+                    SetValue = function(self, val) setToggle(val) end,
                     Get = function(self) return state end,
+                    GetValue = function(self) return state end,
+                    OnChanged = function(self, cb)
+                        if type(cb) == "function" then
+                            table.insert(changedCallbacks, cb)
+                        end
+                        return self
+                    end,
+                    AddKeyPicker = function(self, idx, cfg)
+                        cfg = cfg or {}
+                        hasKeybind = true
+                        if cfg.Default ~= nil then boundKey = cfg.Default
+                        elseif cfg.Key ~= nil then boundKey = cfg.Key end
+                        if cfg.Mode ~= nil then mode = tostring(cfg.Mode):lower() end
+                        updateKeybindDisplay()
+
+                        local kp = {
+                            Type = "KeyPicker",
+                            Id = toggleId,
+                            Name = cfg.Text or cfg.Name or toggleName,
+                            Value = boundKey,
+                            Mode = mode,
+                            Active = (mode == "always" or state),
+                            GetState = function(s) return (mode == "always" or state) end,
+                            GetValue = function(s) return { Key = boundKey, Mode = mode, Active = (mode == "always" or state) } end,
+                            SetKey = function(s, k) thisRightClickItem.setKey(k) end,
+                            SetMode = function(s, m) thisRightClickItem.setMode(m) end,
+                            SetValue = function(s, k, m)
+                                if k ~= nil then thisRightClickItem.setKey(k) end
+                                if m ~= nil then thisRightClickItem.setMode(m) end
+                            end,
+                            ResetKeybind = resetKeybind,
+                            OnClick = function(s, cb) end
+                        }
+                        self.KeyPicker = kp
+                        DeadHub.Options[idx or toggleName] = kp
+                        Window.Options[idx or toggleName] = kp
+                        return kp
+                    end,
                     AddKeybind = function(self, k, m)
                         hasKeybind = true
                         if k ~= nil then boundKey = k end
-                        if m ~= nil then mode = m end
+                        if m ~= nil then mode = tostring(m):lower() end
                         updateKeybindDisplay()
                         return self
                     end,
                     SetKey = function(self, k)
-                        boundKey = k
-                        hasKeybind = (boundKey ~= nil or mode == "always")
-                        updateKeybindDisplay()
+                        thisRightClickItem.setKey(k)
                     end,
                     SetMode = function(self, m)
-                        mode = m
-                        if m == "always" then setToggle(true) else updateKeybindDisplay() end
+                        thisRightClickItem.setMode(m)
                     end,
                     AddColorpicker = function(self, defaultColor, defaultAlpha, cb)
                         defaultColor = defaultColor or Color3.fromRGB(230, 57, 70)
@@ -4413,6 +4602,11 @@ end
                     end
                 }
 
+                DeadHub.Toggles[toggleName] = toggleObj
+                Window.Toggles[toggleName] = toggleObj
+                DeadHub.Flags[toggleName] = state
+                Window.Flags[toggleName] = state
+
                 configRegistry[toggleName] = {
                     type = "toggle",
                     get = function() return state end,
@@ -4424,6 +4618,249 @@ end
                 end
 
                 return toggleObj
+            end
+
+            -- 1.1 Add Standalone KeyPicker / Keybind (Linoria Architecture & DeadHub style)
+            function Column:AddKeyPicker(idx, info)
+                info = info or {}
+                local kpName = info.Text or info.Name or idx or "Keybind"
+                local defaultKey = info.Default or info.Key or nil
+                local initialMode = (info.Mode or "Toggle"):lower()
+                local callback = info.Callback or function() end
+                local kpId = "keypicker_" .. tostring(idx):gsub("%s+", "_"):lower()
+
+                local boundKey = defaultKey
+                local mode = initialMode
+                local active = (mode == "always")
+                local changedCallbacks = {}
+
+                local Row = Instance.new("Frame")
+                Row.Name = "KeyPickerRow_" .. kpName
+                Row.Active = false
+                Row.Size = UDim2.new(1, 0, 0, 26)
+                Row.BackgroundTransparency = 1
+                Row.ZIndex = 24
+                Row.Parent = ColContent
+
+                local Label = Instance.new("TextLabel")
+                Label.Name = "Label"
+                Label.Active = false
+                Label.Size = UDim2.new(1, -54, 1, 0)
+                Label.Position = UDim2.new(0, 0, 0, 0)
+                Label.BackgroundTransparency = 1
+                Label.Font = ThemeFont
+                Label.Text = kpName
+                Label.TextSize = 13
+                Label.TextColor3 = Color3.fromRGB(215, 220, 230)
+                Label.TextXAlignment = Enum.TextXAlignment.Left
+                Label.TextYAlignment = Enum.TextYAlignment.Center
+                Label.TextTruncate = Enum.TextTruncate.AtEnd
+                Label.ZIndex = 25
+                Label.Parent = Row
+
+                local KeybindBtn = Instance.new("Frame")
+                KeybindBtn.Name = "KeybindBtn"
+                KeybindBtn.Active = false
+                KeybindBtn.Size = UDim2.new(0, 46, 0, 18)
+                KeybindBtn.Position = UDim2.new(1, -46, 0.5, -9)
+                KeybindBtn.BackgroundColor3 = Color3.fromRGB(22, 24, 30)
+                KeybindBtn.BorderSizePixel = 0
+                KeybindBtn.ZIndex = 26
+                KeybindBtn.Parent = Row
+
+                local KeybindCorner = Instance.new("UICorner")
+                KeybindCorner.CornerRadius = UDim.new(0, 4)
+                KeybindCorner.Parent = KeybindBtn
+
+                local KeybindStroke = Instance.new("UIStroke")
+                KeybindStroke.Thickness = 1
+                KeybindStroke.Color = Color3.fromRGB(44, 48, 62)
+                KeybindStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                KeybindStroke.Parent = KeybindBtn
+
+                local KeybindText = Instance.new("TextLabel")
+                KeybindText.Name = "Text"
+                KeybindText.Active = false
+                KeybindText.Size = UDim2.new(1, 0, 1, 0)
+                KeybindText.BackgroundTransparency = 1
+                KeybindText.Font = ThemeFontBold
+                KeybindText.TextSize = 10
+                KeybindText.TextColor3 = Color3.fromRGB(150, 155, 175)
+                KeybindText.TextXAlignment = Enum.TextXAlignment.Center
+                KeybindText.TextYAlignment = Enum.TextYAlignment.Center
+                KeybindText.ZIndex = 27
+                KeybindText.Parent = KeybindBtn
+
+                local rightClickItem = nil
+
+                local function updateDisplay()
+                    local isListening = (isListeningKeybind and activeContextItem and activeContextItem.id == kpId)
+                    if isListening then
+                        KeybindText.Text = "[ ... ]"
+                        KeybindText.TextColor3 = Color3.fromRGB(230, 57, 70)
+                        KeybindStroke.Color = Color3.fromRGB(230, 57, 70)
+                    else
+                        KeybindText.Text = formatKeyBadge(boundKey)
+                        KeybindText.TextColor3 = (mode == "always" or boundKey ~= nil) and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(150, 155, 175)
+                        KeybindStroke.Color = Color3.fromRGB(44, 48, 62)
+                    end
+
+                    local kName = formatKeyName(boundKey)
+                    if mode == "always" then
+                        Window:SetKeybind(kpId, kpName, "always", true, kName)
+                    elseif boundKey ~= nil then
+                        Window:SetKeybind(kpId, kpName, mode, active, kName)
+                    else
+                        Window:RemoveKeybind(kpId)
+                    end
+                end
+
+                local function setActiveState(newState)
+                    if mode == "always" then
+                        newState = true
+                    end
+                    active = newState
+                    updateDisplay()
+                    pcall(callback, active)
+                    for _, cb in ipairs(changedCallbacks) do
+                        pcall(cb, active)
+                    end
+                end
+
+                local function resetKeybind()
+                    boundKey = nil
+                    mode = "toggle"
+                    setActiveState(false)
+                    updateDisplay()
+                    if activeContextItem and activeContextItem.id == kpId then
+                        updateContextMenuUI()
+                    end
+                end
+
+                rightClickItem = {
+                    id = kpId,
+                    name = kpName,
+                    row = Row,
+                    keybindBtn = KeybindBtn,
+                    resetKeybind = resetKeybind,
+                    getMode = function() return mode end,
+                    getActive = function() return (mode == "always" or active) end,
+                    setMode = function(newMode)
+                        mode = (newMode or "toggle"):lower()
+                        if mode == "always" then
+                            setActiveState(true)
+                        elseif mode == "hold" then
+                            setActiveState(isKeyPhysicallyDown(boundKey))
+                        end
+                        updateDisplay()
+                    end,
+                    getKey = function() return boundKey end,
+                    setKey = function(newKey)
+                        boundKey = newKey
+                        if mode == "hold" then
+                            setActiveState(isKeyPhysicallyDown(boundKey))
+                        end
+                        updateDisplay()
+                    end,
+                    toggle = function()
+                        if mode == "toggle" then
+                            setActiveState(not active)
+                        end
+                    end,
+                    set = function(val)
+                        if mode == "always" then
+                            setActiveState(true)
+                        else
+                            setActiveState(val)
+                        end
+                    end
+                }
+
+                table.insert(rightClickRegistry, rightClickItem)
+                table.insert(keybindRegistry, rightClickItem)
+
+                table.insert(clickableRegistry, {
+                    object = Row,
+                    onClick = function()
+                        if ContextMenu.Visible and activeContextItem == rightClickItem then
+                            ContextMenu.Visible = false
+                            isListeningKeybind = false
+                            activeContextItem = nil
+                        else
+                            openContextMenuForItem(rightClickItem)
+                        end
+                    end,
+                    onHover = function(isHovered)
+                        TweenService:Create(Label, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(215, 220, 230)
+                        }):Play()
+                        if not isListeningKeybind or activeContextItem ~= rightClickItem then
+                            TweenService:Create(KeybindStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                                Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(44, 48, 62)
+                            }):Play()
+                            TweenService:Create(KeybindBtn, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                                BackgroundColor3 = isHovered and Color3.fromRGB(28, 30, 38) or Color3.fromRGB(22, 24, 30)
+                            }):Play()
+                        end
+                    end
+                })
+
+                updateDisplay()
+
+                local kpObj = {
+                    Type = "KeyPicker",
+                    Id = kpId,
+                    Name = kpName,
+                    Value = boundKey,
+                    Mode = mode,
+                    Active = active,
+                    Row = Row,
+                    SetVisible = function(self, vis) Row.Visible = (vis == true) end,
+                    GetVisible = function(self) return Row.Visible end,
+                    GetState = function(self) return (mode == "always" or active) end,
+                    GetValue = function(self) return { Key = boundKey, Mode = mode, Active = (mode == "always" or active) } end,
+                    SetKey = function(self, k) rightClickItem.setKey(k) end,
+                    SetMode = function(self, m) rightClickItem.setMode(m) end,
+                    SetValue = function(self, k, m)
+                        if k ~= nil then rightClickItem.setKey(k) end
+                        if m ~= nil then rightClickItem.setMode(m) end
+                    end,
+                    SetActive = function(self, state) setActiveState(state) end,
+                    ResetKeybind = resetKeybind,
+                    OnChanged = function(self, cb)
+                        if type(cb) == "function" then
+                            table.insert(changedCallbacks, cb)
+                        end
+                        return self
+                    end,
+                    OnClick = function(self, cb)
+                        return self
+                    end
+                }
+
+                DeadHub.Options[idx] = kpObj
+                Window.Options[idx] = kpObj
+                configRegistry[idx] = {
+                    type = "keypicker",
+                    get = function() return { Key = boundKey and tostring(boundKey.Name or boundKey) or nil, Mode = mode } end,
+                    set = function(v)
+                        if type(v) == "table" then
+                            if v.Mode then rightClickItem.setMode(v.Mode) end
+                            if v.Key then rightClickItem.setKey(v.Key) end
+                        end
+                    end
+                }
+
+                return kpObj
+            end
+
+            function Column:AddKeybind(name, defaultKey, mode, callback)
+                return self:AddKeyPicker(name, {
+                    Text = name,
+                    Default = defaultKey,
+                    Mode = mode,
+                    Callback = callback
+                })
             end
 
             -- 2. Add Button (Modern button with optional icon)
