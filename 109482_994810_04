@@ -1382,7 +1382,11 @@ local function toggleMenu(show)
             DropdownOverlay.Close()
         end
 
-
+        if ContextMenu then
+            ContextMenu.Visible = false
+            isListeningKeybind = false
+            activeContextItem = nil
+        end
 
         if isListeningMenuKey then
             isListeningMenuKey = false
@@ -2277,7 +2281,7 @@ local DropdownOverlay = (function()
     Scroll.BackgroundTransparency = 1
     Scroll.BorderSizePixel = 0
     Scroll.ScrollBarThickness = 3
-    Scroll.ScrollBarImageColor3 = Color3.fromRGB(230, 57, 70)
+    Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 189, 255)
     Scroll.ScrollBarImageTransparency = 0
     Scroll.ClipsDescendants = true
     Scroll.ZIndex = 601
@@ -2425,7 +2429,7 @@ local DropdownOverlay = (function()
                 cMark.Size = UDim2.new(1, 0, 1, 0)
                 cMark.BackgroundTransparency = 1
                 cMark.Font = ThemeFontBold
-                cMark.Text = "+"
+                cMark.Text = "✓"
                 cMark.TextSize = 10
                 cMark.TextColor3 = Color3.fromRGB(255, 255, 255)
                 cMark.TextXAlignment = Enum.TextXAlignment.Center
@@ -2464,16 +2468,16 @@ local DropdownOverlay = (function()
                 if isMulti then
                     local isSel = (currentVal[it.name] == true)
                     it.mark.Visible = isSel
-                    it.check.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(30, 32, 38)
-                    it.checkStroke.Color = isSel and Color3.fromRGB(255, 95, 110) or Color3.fromRGB(50, 54, 66)
+                    it.check.BackgroundColor3 = isSel and Color3.fromRGB(0, 189, 255) or Color3.fromRGB(30, 32, 38)
+                    it.checkStroke.Color = isSel and Color3.fromRGB(50, 205, 255) or Color3.fromRGB(50, 54, 66)
                     it.text.TextColor3 = isSel and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 155, 170)
-                    it.frame.BackgroundColor3 = isSel and Color3.fromRGB(28, 28, 34) or Color3.fromRGB(24, 24, 28)
+                    it.frame.BackgroundColor3 = isSel and Color3.fromRGB(24, 30, 40) or Color3.fromRGB(24, 24, 28)
                 else
                     local isSel = (currentVal == it.name)
                     it.text.TextColor3 = isSel and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 155, 170)
                     it.text.Font = isSel and ThemeFontBold or ThemeFont
-                    it.stroke.Color = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(38, 40, 48)
-                    it.frame.BackgroundColor3 = isSel and Color3.fromRGB(30, 30, 38) or Color3.fromRGB(24, 24, 28)
+                    it.stroke.Color = isSel and Color3.fromRGB(0, 189, 255) or Color3.fromRGB(38, 40, 48)
+                    it.frame.BackgroundColor3 = isSel and Color3.fromRGB(24, 30, 40) or Color3.fromRGB(24, 24, 28)
                 end
             end
         end
@@ -2495,10 +2499,10 @@ local DropdownOverlay = (function()
                         end
                         local isSel = (currentVal[it.name] == true)
                         it.mark.Visible = isSel
-                        it.check.BackgroundColor3 = isSel and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(30, 32, 38)
-                        it.checkStroke.Color = isSel and Color3.fromRGB(255, 95, 110) or Color3.fromRGB(50, 54, 66)
+                        it.check.BackgroundColor3 = isSel and Color3.fromRGB(0, 189, 255) or Color3.fromRGB(30, 32, 38)
+                        it.checkStroke.Color = isSel and Color3.fromRGB(50, 205, 255) or Color3.fromRGB(50, 54, 66)
                         it.text.TextColor3 = isSel and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 155, 170)
-                        it.frame.BackgroundColor3 = isSel and Color3.fromRGB(28, 28, 34) or Color3.fromRGB(24, 24, 28)
+                        it.frame.BackgroundColor3 = isSel and Color3.fromRGB(24, 30, 40) or Color3.fromRGB(24, 24, 28)
 
                         if updateDisplayCb then pcall(updateDisplayCb, currentVal) end
                         if currentCallback then pcall(currentCallback, currentVal) end
@@ -2560,20 +2564,23 @@ local DropdownOverlay = (function()
     }
 end)()
 
--- Context Menu for Function Modes (Always / Toggle / Hold) & Keybinds
 local ContextMenu = Instance.new("Frame")
 ContextMenu.Name = "DH_ContextMenu"
 ContextMenu.Active = false
 ContextMenu.Visible = false
-ContextMenu.Size = UDim2.new(0, 136, 0, 130)
-ContextMenu.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+ContextMenu.Size = UDim2.new(0, 140, 0, 132)
+ContextMenu.BackgroundColor3 = Color3.fromRGB(18, 20, 26)
 ContextMenu.BorderSizePixel = 0
 ContextMenu.ZIndex = 200
 ContextMenu.Parent = ScreenGui
 
+local ContextCorner = Instance.new("UICorner")
+ContextCorner.CornerRadius = UDim.new(0, 6)
+ContextCorner.Parent = ContextMenu
+
 local ContextStroke = Instance.new("UIStroke")
 ContextStroke.Thickness = 1
-ContextStroke.Color = Color3.fromRGB(44, 46, 56)
+ContextStroke.Color = Color3.fromRGB(42, 46, 58)
 ContextStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 ContextStroke.Parent = ContextMenu
 
@@ -2581,12 +2588,12 @@ local ContextTitle = Instance.new("TextLabel")
 ContextTitle.Name = "ContextTitle"
 ContextTitle.Active = false
 ContextTitle.Size = UDim2.new(1, -16, 0, 20)
-ContextTitle.Position = UDim2.new(0, 8, 0, 2)
+ContextTitle.Position = UDim2.new(0, 8, 0, 3)
 ContextTitle.BackgroundTransparency = 1
 ContextTitle.Font = ThemeFontBold
 ContextTitle.Text = "Options"
 ContextTitle.TextSize = 12
-ContextTitle.TextColor3 = Color3.fromRGB(180, 185, 200)
+ContextTitle.TextColor3 = Color3.fromRGB(220, 225, 240)
 ContextTitle.TextXAlignment = Enum.TextXAlignment.Left
 ContextTitle.TextYAlignment = Enum.TextYAlignment.Center
 ContextTitle.TextTruncate = Enum.TextTruncate.AtEnd
@@ -2597,26 +2604,29 @@ local ContextDivider = Instance.new("Frame")
 ContextDivider.Name = "ContextDivider"
 ContextDivider.Active = false
 ContextDivider.Size = UDim2.new(1, 0, 0, 1)
-ContextDivider.Position = UDim2.new(0, 0, 0, 23)
-ContextDivider.BackgroundColor3 = Color3.fromRGB(34, 36, 44)
+ContextDivider.Position = UDim2.new(0, 0, 0, 24)
+ContextDivider.BackgroundColor3 = Color3.fromRGB(34, 38, 48)
 ContextDivider.BorderSizePixel = 0
 ContextDivider.ZIndex = 201
 ContextDivider.Parent = ContextMenu
 
--- Keybind Row in Context Menu
 local CtxKeybindRow = Instance.new("Frame")
 CtxKeybindRow.Name = "CtxKeybindRow"
 CtxKeybindRow.Active = false
 CtxKeybindRow.Size = UDim2.new(1, -12, 0, 20)
-CtxKeybindRow.Position = UDim2.new(0, 6, 0, 27)
-CtxKeybindRow.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+CtxKeybindRow.Position = UDim2.new(0, 6, 0, 28)
+CtxKeybindRow.BackgroundColor3 = Color3.fromRGB(24, 26, 34)
 CtxKeybindRow.BorderSizePixel = 0
 CtxKeybindRow.ZIndex = 202
 CtxKeybindRow.Parent = ContextMenu
 
+local CtxKeybindCorner = Instance.new("UICorner")
+CtxKeybindCorner.CornerRadius = UDim.new(0, 4)
+CtxKeybindCorner.Parent = CtxKeybindRow
+
 local CtxKeybindStroke = Instance.new("UIStroke")
 CtxKeybindStroke.Thickness = 1
-CtxKeybindStroke.Color = Color3.fromRGB(40, 42, 50)
+CtxKeybindStroke.Color = Color3.fromRGB(42, 46, 58)
 CtxKeybindStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 CtxKeybindStroke.Parent = CtxKeybindRow
 
@@ -2627,7 +2637,7 @@ CtxKeybindText.Size = UDim2.new(1, 0, 1, 0)
 CtxKeybindText.BackgroundTransparency = 1
 CtxKeybindText.Font = ThemeFontBold
 CtxKeybindText.Text = "Key: [ None ]"
-CtxKeybindText.TextSize = 11
+CtxKeybindText.TextSize = 10
 CtxKeybindText.TextColor3 = Color3.fromRGB(215, 220, 235)
 CtxKeybindText.TextXAlignment = Enum.TextXAlignment.Center
 CtxKeybindText.TextYAlignment = Enum.TextYAlignment.Center
@@ -2636,54 +2646,65 @@ CtxKeybindText.Parent = CtxKeybindRow
 
 local lastKeybindRowClickTime = 0
 
--- Mode Rows: Always, Toggle, Hold
-local modeRowConfigs = {"Always", "Toggle", "Hold"}
+local modeRowConfigs = {
+    { id = "always", title = "Always" },
+    { id = "hold", title = "Hold" },
+    { id = "toggle", title = "Toggle" }
+}
 local modeButtons = {}
 
-for i, modeName in ipairs(modeRowConfigs) do
+for i, mCfg in ipairs(modeRowConfigs) do
     local mRow = Instance.new("Frame")
-    mRow.Name = "Mode_" .. modeName
+    mRow.Name = "Mode_" .. mCfg.id
     mRow.Active = false
     mRow.Size = UDim2.new(1, -12, 0, 22)
-    mRow.Position = UDim2.new(0, 6, 0, 50 + (i - 1) * 24)
-    mRow.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+    mRow.Position = UDim2.new(0, 6, 0, 52 + (i - 1) * 25)
+    mRow.BackgroundColor3 = Color3.fromRGB(22, 23, 28)
     mRow.BorderSizePixel = 0
     mRow.ZIndex = 202
     mRow.Parent = ContextMenu
 
+    local mRowCorner = Instance.new("UICorner")
+    mRowCorner.CornerRadius = UDim.new(0, 4)
+    mRowCorner.Parent = mRow
+
     local mStroke = Instance.new("UIStroke")
     mStroke.Thickness = 1
-    mStroke.Color = Color3.fromRGB(36, 38, 46)
+    mStroke.Color = Color3.fromRGB(36, 38, 48)
     mStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     mStroke.Parent = mRow
 
     local mDot = Instance.new("Frame")
     mDot.Name = "Dot"
     mDot.Active = false
-    mDot.Size = UDim2.new(0, 4, 0, 4)
-    mDot.Position = UDim2.new(0, 8, 0.5, -2)
-    mDot.BackgroundColor3 = Color3.fromRGB(230, 57, 70)
+    mDot.Size = UDim2.new(0, 6, 0, 6)
+    mDot.Position = UDim2.new(0, 8, 0.5, -3)
+    mDot.BackgroundColor3 = Color3.fromRGB(0, 189, 255)
     mDot.BorderSizePixel = 0
     mDot.Visible = false
     mDot.ZIndex = 203
     mDot.Parent = mRow
 
+    local mDotCorner = Instance.new("UICorner")
+    mDotCorner.CornerRadius = UDim.new(0, 3)
+    mDotCorner.Parent = mDot
+
     local mLbl = Instance.new("TextLabel")
     mLbl.Name = "Label"
     mLbl.Active = false
-    mLbl.Size = UDim2.new(1, -22, 1, 0)
-    mLbl.Position = UDim2.new(0, 18, 0, 0)
+    mLbl.Size = UDim2.new(1, -24, 1, 0)
+    mLbl.Position = UDim2.new(0, 20, 0, 0)
     mLbl.BackgroundTransparency = 1
     mLbl.Font = ThemeFont
-    mLbl.Text = modeName
-    mLbl.TextSize = 12
-    mLbl.TextColor3 = Color3.fromRGB(160, 165, 180)
+    mLbl.Text = mCfg.title
+    mLbl.TextSize = 11
+    mLbl.TextColor3 = Color3.fromRGB(150, 155, 170)
     mLbl.TextXAlignment = Enum.TextXAlignment.Left
     mLbl.TextYAlignment = Enum.TextYAlignment.Center
     mLbl.ZIndex = 203
     mLbl.Parent = mRow
 
-    modeButtons[modeName:lower()] = {row = mRow, stroke = mStroke, dot = mDot, lbl = mLbl}
+    modeButtons[mCfg.id] = {row = mRow, stroke = mStroke, dot = mDot, lbl = mLbl, id = mCfg.id}
 end
 
 local function updateContextMenuUI()
@@ -2692,29 +2713,31 @@ local function updateContextMenuUI()
 
     if isListeningKeybind then
         CtxKeybindText.Text = "Press any key..."
-        CtxKeybindText.TextColor3 = Color3.fromRGB(230, 57, 70)
-        TweenService:Create(CtxKeybindStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Color = Color3.fromRGB(230, 57, 70)}):Play()
+        CtxKeybindText.TextColor3 = Color3.fromRGB(0, 189, 255)
+        TweenService:Create(CtxKeybindStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Color = Color3.fromRGB(0, 189, 255)}):Play()
     else
         local k = activeContextItem.getKey()
-        local kName = k and k.Name or "None"
+        local kName = "None"
+        if k then
+            if k == Enum.UserInputType.MouseButton1 then kName = "Mouse1"
+            elseif k == Enum.UserInputType.MouseButton2 then kName = "Mouse2"
+            elseif k == Enum.UserInputType.MouseButton3 then kName = "Mouse3"
+            else kName = tostring(k.Name or k)
+            end
+        end
         CtxKeybindText.Text = "Key: [ " .. kName .. " ]"
         CtxKeybindText.TextColor3 = Color3.fromRGB(215, 220, 235)
-        TweenService:Create(CtxKeybindStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Color = Color3.fromRGB(40, 42, 50)}):Play()
+        TweenService:Create(CtxKeybindStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Color = Color3.fromRGB(42, 46, 58)}):Play()
     end
 
-    local curMode = activeContextItem.getMode()
-    for mName, mObj in pairs(modeButtons) do
-        if mObj.activeStrokeTween then
-            mObj.activeStrokeTween:Cancel()
-            mObj.activeStrokeTween = nil
-        end
-        mObj._isHov = false
-        local isSelected = (mName == curMode)
+    local curMode = (activeContextItem.getMode() or "toggle"):lower()
+    for mId, mObj in pairs(modeButtons) do
+        local isSelected = (mId == curMode)
         mObj.dot.Visible = isSelected
-        mObj.lbl.TextColor3 = isSelected and Color3.fromRGB(245, 245, 250) or Color3.fromRGB(150, 155, 170)
+        mObj.lbl.TextColor3 = isSelected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 155, 170)
         mObj.lbl.Font = isSelected and ThemeFontBold or ThemeFont
-        mObj.row.BackgroundColor3 = isSelected and Color3.fromRGB(28, 28, 34) or Color3.fromRGB(24, 24, 28)
-        mObj.stroke.Color = isSelected and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(36, 38, 46)
+        mObj.row.BackgroundColor3 = isSelected and Color3.fromRGB(24, 30, 42) or Color3.fromRGB(22, 23, 28)
+        mObj.stroke.Color = isSelected and Color3.fromRGB(0, 189, 255) or Color3.fromRGB(36, 38, 48)
     end
 end
 
@@ -2896,23 +2919,37 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
         if MainFrame.Visible and menuOpen then
             for _, item in ipairs(rightClickRegistry) do
-                if item.object and isInside(clickX, clickY, item.object) then
+                local isHit = (item.keybindBtn and item.keybindBtn.Visible and isInside(clickX, clickY, item.keybindBtn)) or (item.object and isInside(clickX, clickY, item.object))
+                if isHit then
                     activeContextItem = item
                     isListeningKeybind = false
                     updateContextMenuUI()
 
-                    local sp = item.switch and item.switch.AbsolutePosition or item.object.AbsolutePosition
-                    local ss = item.switch and item.switch.AbsoluteSize or item.object.AbsoluteSize
+                    local anchor = (item.keybindBtn and item.keybindBtn.Visible and item.keybindBtn) or item.switch or item.object
+                    local sp = anchor.AbsolutePosition
+                    local ss = anchor.AbsoluteSize
                     local vp = getViewportSize()
-                    local targetX = sp.X - 145
+                    local targetX = sp.X - 150
                     if targetX < 10 then
                         targetX = sp.X + ss.X + 8
                     end
-                    targetX = math.clamp(targetX, 10, math.max(10, vp.X - 145))
-                    local targetY = math.clamp(sp.Y - 10, 10, math.max(10, vp.Y - 140))
+                    targetX = math.clamp(targetX, 10, math.max(10, vp.X - 150))
+                    local targetY = math.clamp(sp.Y - 10, 10, math.max(10, vp.Y - 145))
                     ContextMenu.Position = UDim2.fromOffset(targetX, targetY)
                     ContextMenu.Visible = true
                     return
+                end
+            end
+        elseif not menuOpen and not gameProcessed then
+            for _, item in ipairs(rightClickRegistry) do
+                local k = item.getKey()
+                if k and k == Enum.UserInputType.MouseButton2 then
+                    local m = (item.getMode() or "toggle"):lower()
+                    if m == "toggle" then
+                        item.toggle()
+                    elseif m == "hold" then
+                        item.set(true)
+                    end
                 end
             end
         end
@@ -2951,14 +2988,27 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end
 
         if isListeningKeybind and activeContextItem then
+            local bound = nil
+            local cancelled = false
             if input.UserInputType == Enum.UserInputType.Keyboard then
-                pcall(function()
-                    if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.Backspace then
-                        activeContextItem.setKey(nil)
-                    elseif input.KeyCode ~= Enum.KeyCode.Unknown then
-                        activeContextItem.setKey(input.KeyCode)
-                    end
-                end)
+                if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.Backspace then
+                    cancelled = true
+                elseif input.KeyCode ~= Enum.KeyCode.Unknown then
+                    bound = input.KeyCode
+                end
+            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                bound = Enum.UserInputType.MouseButton2
+            elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+                bound = Enum.UserInputType.MouseButton3
+            end
+
+            if cancelled then
+                activeContextItem.setKey(nil)
+                isListeningKeybind = false
+                updateContextMenuUI()
+                return
+            elseif bound ~= nil then
+                activeContextItem.setKey(bound)
                 isListeningKeybind = false
                 updateContextMenuUI()
                 return
@@ -2968,11 +3018,10 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if (menuKey and input.KeyCode == menuKey) or input.KeyCode == Enum.KeyCode.Insert then
             toggleMenu()
         else
-            -- Check Gameplay Keybind Triggers
             for _, item in ipairs(rightClickRegistry) do
                 local k = item.getKey()
-                if k and input.KeyCode == k then
-                    local m = item.getMode()
+                if k and (input.KeyCode == k or input.UserInputType == k) then
+                    local m = (item.getMode() or "toggle"):lower()
                     if m == "toggle" then
                         item.toggle()
                     elseif m == "hold" then
@@ -3184,12 +3233,11 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
         if ColorPicker and ColorPicker.EndDrag then
             pcall(ColorPicker.EndDrag)
         end
-    elseif not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
-        -- Handle Release for Hold mode keybinds
+    elseif not gameProcessed then
         for _, item in ipairs(rightClickRegistry) do
             local k = item.getKey()
-            if k and input.KeyCode == k then
-                if item.getMode() == "hold" then
+            if k and (input.KeyCode == k or input.UserInputType == k) then
+                if (item.getMode() or "toggle"):lower() == "hold" then
                     item.set(false)
                 end
             end
@@ -3794,6 +3842,10 @@ end
             function Column:AddToggle(toggleName, defaultState, arg3, arg4)
                 local initialColor = nil
                 local colorCallback = nil
+                local hasKeybind = false
+                local defaultKey = nil
+                local initialMode = "toggle"
+
                 if type(toggleName) == "table" then
                     local cfg = toggleName
                     toggleName = cfg.Name or "Toggle"
@@ -3803,12 +3855,14 @@ end
                         initialColor = cfg.Color
                         colorCallback = cfg.ColorCallback
                     end
+                    if cfg.Keybind then
+                        hasKeybind = true
+                        defaultKey = cfg.Key or cfg.DefaultKey
+                        initialMode = cfg.Mode or "toggle"
+                    end
                 end
 
                 local callback = nil
-                local hasKeybind = false
-                local defaultKey = nil
-                local initialMode = "toggle"
 
                 if type(arg3) == "function" then
                     callback = arg3
@@ -3848,7 +3902,7 @@ end
                 local Label = Instance.new("TextLabel")
                 Label.Name = "Label"
                 Label.Active = false
-                Label.Size = UDim2.new(1, -44, 1, 0)
+                Label.Size = hasKeybind and UDim2.new(1, -80, 1, 0) or UDim2.new(1, -44, 1, 0)
                 Label.Position = UDim2.new(0, 0, 0, 0)
                 Label.BackgroundTransparency = 1
                 Label.Font = ThemeFont
@@ -3857,18 +3911,57 @@ end
                 Label.TextColor3 = Color3.fromRGB(215, 220, 230)
                 Label.TextXAlignment = Enum.TextXAlignment.Left
                 Label.TextYAlignment = Enum.TextYAlignment.Center
+                Label.TextTruncate = Enum.TextTruncate.AtEnd
                 Label.ZIndex = 25
                 Label.Parent = Row
+
+                local KeybindBtn = Instance.new("Frame")
+                KeybindBtn.Name = "KeybindBtn"
+                KeybindBtn.Active = false
+                KeybindBtn.Size = UDim2.new(0, 36, 0, 18)
+                KeybindBtn.Position = UDim2.new(1, -74, 0.5, -9)
+                KeybindBtn.BackgroundColor3 = Color3.fromRGB(22, 24, 30)
+                KeybindBtn.BorderSizePixel = 0
+                KeybindBtn.Visible = hasKeybind
+                KeybindBtn.ZIndex = 26
+                KeybindBtn.Parent = Row
+
+                local KeybindCorner = Instance.new("UICorner")
+                KeybindCorner.CornerRadius = UDim.new(0, 4)
+                KeybindCorner.Parent = KeybindBtn
+
+                local KeybindStroke = Instance.new("UIStroke")
+                KeybindStroke.Thickness = 1
+                KeybindStroke.Color = Color3.fromRGB(44, 48, 62)
+                KeybindStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                KeybindStroke.Parent = KeybindBtn
+
+                local KeybindText = Instance.new("TextLabel")
+                KeybindText.Name = "Text"
+                KeybindText.Active = false
+                KeybindText.Size = UDim2.new(1, 0, 1, 0)
+                KeybindText.BackgroundTransparency = 1
+                KeybindText.Font = ThemeFontBold
+                KeybindText.TextSize = 10
+                KeybindText.TextColor3 = Color3.fromRGB(150, 155, 175)
+                KeybindText.TextXAlignment = Enum.TextXAlignment.Center
+                KeybindText.TextYAlignment = Enum.TextYAlignment.Center
+                KeybindText.ZIndex = 27
+                KeybindText.Parent = KeybindBtn
 
                 local Switch = Instance.new("Frame")
                 Switch.Name = "Switch"
                 Switch.Active = false
                 Switch.Size = UDim2.new(0, 32, 0, 16)
                 Switch.Position = UDim2.new(1, -32, 0.5, -8)
-                Switch.BackgroundColor3 = state and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(28, 28, 34)
+                Switch.BackgroundColor3 = state and Color3.fromRGB(0, 189, 255) or Color3.fromRGB(28, 28, 34)
                 Switch.BorderSizePixel = 0
                 Switch.ZIndex = 25
                 Switch.Parent = Row
+
+                local SwitchCorner = Instance.new("UICorner")
+                SwitchCorner.CornerRadius = UDim.new(0, 3)
+                SwitchCorner.Parent = Switch
 
                 local SwitchHitbox = Instance.new("Frame")
                 SwitchHitbox.Name = "SwitchHitbox"
@@ -3895,9 +3988,67 @@ end
                 Knob.ZIndex = 26
                 Knob.Parent = Switch
 
+                local KnobCorner = Instance.new("UICorner")
+                KnobCorner.CornerRadius = UDim.new(0, 2)
+                KnobCorner.Parent = Knob
+
+                local function formatKeyLabel(k)
+                    if not k then return "[-]" end
+                    if k == Enum.UserInputType.MouseButton1 then return "[M1]" end
+                    if k == Enum.UserInputType.MouseButton2 then return "[M2]" end
+                    if k == Enum.UserInputType.MouseButton3 then return "[M3]" end
+                    local n = tostring(k.Name or k)
+                    if n == "RightShift" then return "[RShift]" end
+                    if n == "LeftShift" then return "[LShift]" end
+                    if n == "RightControl" then return "[RCtrl]" end
+                    if n == "LeftControl" then return "[LCtrl]" end
+                    if n == "RightAlt" then return "[RAlt]" end
+                    if n == "LeftAlt" then return "[LAlt]" end
+                    if n == "CapsLock" then return "[Caps]" end
+                    return "[" .. n .. "]"
+                end
+
+                local thisRightClickItem = nil
+
                 local function updateKeybindDisplay()
-                    if not hasKeybind then return end
-                    local keyName = boundKey and boundKey.Name or nil
+                    KeybindBtn.Visible = hasKeybind
+                    if hasKeybind then
+                        if swatchBtnRef then
+                            SwatchBtn.Position = UDim2.new(1, -104, 0.5, -7)
+                            Label.Size = UDim2.new(1, -112, 1, 0)
+                        else
+                            Label.Size = UDim2.new(1, -80, 1, 0)
+                        end
+                    else
+                        if swatchBtnRef then
+                            SwatchBtn.Position = UDim2.new(1, -62, 0.5, -7)
+                            Label.Size = UDim2.new(1, -70, 1, 0)
+                        else
+                            Label.Size = UDim2.new(1, -44, 1, 0)
+                        end
+                    end
+
+                    if not hasKeybind then
+                        Window:RemoveKeybind(toggleId)
+                        return
+                    end
+
+                    local isListening = (isListeningKeybind and activeContextItem and activeContextItem.id == toggleId)
+                    if isListening then
+                        KeybindText.Text = "[ ... ]"
+                        KeybindText.TextColor3 = Color3.fromRGB(0, 189, 255)
+                        KeybindStroke.Color = Color3.fromRGB(0, 189, 255)
+                    else
+                        KeybindText.Text = formatKeyLabel(boundKey)
+                        KeybindText.TextColor3 = (mode == "always" or boundKey ~= nil) and Color3.fromRGB(0, 189, 255) or Color3.fromRGB(150, 155, 175)
+                        KeybindStroke.Color = Color3.fromRGB(44, 48, 62)
+                    end
+
+                    local keyName = boundKey and (boundKey.Name or tostring(boundKey)) or nil
+                    if boundKey == Enum.UserInputType.MouseButton2 then keyName = "Mouse2"
+                    elseif boundKey == Enum.UserInputType.MouseButton1 then keyName = "Mouse1"
+                    elseif boundKey == Enum.UserInputType.MouseButton3 then keyName = "Mouse3"
+                    end
 
                     if mode == "always" then
                         Window:SetKeybind(toggleId, toggleName, "always", true, keyName)
@@ -3912,14 +4063,14 @@ end
                     boundKey = nil
                     mode = "toggle"
                     updateKeybindDisplay()
-                    if activeContextItem and activeContextItem.object == Row then
+                    if activeContextItem and activeContextItem.id == toggleId then
                         updateContextMenuUI()
                     end
                 end
 
                 local function setToggle(newState)
                     state = newState
-                    local targetColor = state and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(28, 28, 34)
+                    local targetColor = state and Color3.fromRGB(0, 189, 255) or Color3.fromRGB(28, 28, 34)
                     local targetKnobPos = state and UDim2.new(0, 18, 0, 2) or UDim2.new(0, 2, 0, 2)
                     TweenService:Create(Switch, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = targetColor}):Play()
                     TweenService:Create(Knob, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetKnobPos}):Play()
@@ -3928,9 +4079,31 @@ end
                 end
 
                 table.insert(clickableRegistry, {
+                    object = KeybindBtn,
+                    onClick = function()
+                        if not hasKeybind then return end
+                        activeContextItem = thisRightClickItem
+                        isListeningKeybind = not isListeningKeybind
+                        updateKeybindDisplay()
+                        if ContextMenu.Visible then
+                            updateContextMenuUI()
+                        end
+                    end,
+                    onHover = function(isHovered)
+                        if not isListeningKeybind or activeContextItem ~= thisRightClickItem then
+                            KeybindStroke.Color = isHovered and Color3.fromRGB(75, 85, 110) or Color3.fromRGB(44, 48, 62)
+                            KeybindBtn.BackgroundColor3 = isHovered and Color3.fromRGB(28, 30, 38) or Color3.fromRGB(22, 24, 30)
+                        end
+                    end
+                })
+
+                table.insert(clickableRegistry, {
                     object = Row,
                     onClick = function(clickX, clickY)
                         if swatchBtnRef and clickX and clickY and isInside(clickX, clickY, swatchBtnRef) then
+                            return
+                        end
+                        if KeybindBtn.Visible and clickX and clickY and isInside(clickX, clickY, KeybindBtn) then
                             return
                         end
 
@@ -3945,7 +4118,7 @@ end
                             TextColor3 = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(215, 220, 230)
                         }):Play()
                         TweenService:Create(SwitchStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and (state and Color3.fromRGB(255, 110, 125) or Color3.fromRGB(80, 86, 106)) or Color3.fromRGB(50, 54, 66)
+                            Color = isHovered and (state and Color3.fromRGB(50, 205, 255) or Color3.fromRGB(80, 86, 106)) or Color3.fromRGB(50, 54, 66)
                         }):Play()
                         if not state then
                             TweenService:Create(Switch, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
@@ -3955,41 +4128,40 @@ end
                     end
                 })
 
-                local function registerRightClick()
-                    table.insert(rightClickRegistry, {
-                        id = toggleId,
-                        object = SwitchHitbox,
-                        switch = Switch,
-                        name = toggleName,
-                        resetKeybind = resetKeybind,
-                        getMode = function() return mode end,
-                        setMode = function(newMode)
-                            mode = newMode
-                            if mode == "always" then
-                                setToggle(true)
-                            end
-                            updateKeybindDisplay()
-                        end,
-                        getKey = function() return boundKey end,
-                        setKey = function(newKey)
-                            boundKey = newKey
-                            hasKeybind = (boundKey ~= nil or mode == "always")
-                            updateKeybindDisplay()
-                        end,
-                        toggle = function()
-                            if mode == "toggle" then
-                                setToggle(not state)
-                            end
-                        end,
-                        set = function(val)
-                            if mode ~= "always" then
-                                setToggle(val)
-                            end
+                thisRightClickItem = {
+                    id = toggleId,
+                    object = SwitchHitbox,
+                    switch = Switch,
+                    keybindBtn = KeybindBtn,
+                    name = toggleName,
+                    resetKeybind = resetKeybind,
+                    getMode = function() return mode end,
+                    setMode = function(newMode)
+                        mode = newMode
+                        if mode == "always" then
+                            setToggle(true)
                         end
-                    })
-                end
+                        updateKeybindDisplay()
+                    end,
+                    getKey = function() return boundKey end,
+                    setKey = function(newKey)
+                        boundKey = newKey
+                        hasKeybind = (boundKey ~= nil or mode == "always")
+                        updateKeybindDisplay()
+                    end,
+                    toggle = function()
+                        if mode == "toggle" then
+                            setToggle(not state)
+                        end
+                    end,
+                    set = function(val)
+                        if mode ~= "always" then
+                            setToggle(val)
+                        end
+                    end
+                }
+                table.insert(rightClickRegistry, thisRightClickItem)
 
-                registerRightClick()
                 if hasKeybind then
                     updateKeybindDisplay()
                 end
@@ -4014,7 +4186,7 @@ end
                         if m == "always" then setToggle(true) else updateKeybindDisplay() end
                     end,
                     AddColorpicker = function(self, defaultColor, defaultAlpha, cb)
-                        defaultColor = defaultColor or Color3.fromRGB(230, 57, 70)
+                        defaultColor = defaultColor or Color3.fromRGB(0, 189, 255)
                         defaultAlpha = defaultAlpha ~= nil and defaultAlpha or 1
                         cb = cb or function() end
 
@@ -4022,7 +4194,7 @@ end
                         SwatchBtn.Name = "SwatchBtn"
                         SwatchBtn.Active = false
                         SwatchBtn.Size = UDim2.new(0, 24, 0, 14)
-                        SwatchBtn.Position = UDim2.new(1, -62, 0.5, -7)
+                        SwatchBtn.Position = hasKeybind and UDim2.new(1, -104, 0.5, -7) or UDim2.new(1, -62, 0.5, -7)
                         SwatchBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
                         SwatchBtn.BorderSizePixel = 0
                         SwatchBtn.ZIndex = 26
@@ -4073,7 +4245,7 @@ end
                             end
                         })
 
-                        Label.Size = UDim2.new(1, -70, 1, 0)
+                        Label.Size = hasKeybind and UDim2.new(1, -112, 1, 0) or UDim2.new(1, -70, 1, 0)
                         return self
                     end
                 }
@@ -4768,7 +4940,7 @@ end
                             Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
                         }):Play()
                         TweenService:Create(Arrow, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            TextColor3 = isHovered and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(140, 145, 160)
+                            TextColor3 = isHovered and Color3.fromRGB(0, 189, 255) or Color3.fromRGB(140, 145, 160)
                         }):Play()
                     end
                 })
@@ -4926,7 +5098,7 @@ end
                             Color = isHovered and Color3.fromRGB(75, 82, 102) or Color3.fromRGB(44, 46, 56)
                         }):Play()
                         TweenService:Create(Arrow, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            TextColor3 = isHovered and Color3.fromRGB(230, 57, 70) or Color3.fromRGB(140, 145, 160)
+                            TextColor3 = isHovered and Color3.fromRGB(0, 189, 255) or Color3.fromRGB(140, 145, 160)
                         }):Play()
                     end
                 })
