@@ -2751,8 +2751,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         local elapsed = now - (listenStartTick or 0)
 
         if ContextMenu.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local cx = input.Position.X
-            local cy = input.Position.Y
+            local mPos = UserInputService:GetMouseLocation()
+            local cx = mPos.X
+            local cy = mPos.Y
             for mName, mObj in pairs(modeButtons) do
                 if isInside(cx, cy, mObj.row) then
                     isListeningKeybind = false
@@ -2847,8 +2848,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        local clickX = input.Position.X
-        local clickY = input.Position.Y
+        local mPos = UserInputService:GetMouseLocation()
+        local clickX = mPos.X
+        local clickY = mPos.Y
 
         -- 0. Check if Watermark was clicked for dragging (Priority hit-test)
         if WatermarkFrame.Visible and watermarkEnabled and isInside(clickX, clickY, WatermarkFrame) then
@@ -2994,8 +2996,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             end
         end
     elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-        local clickX = input.Position.X
-        local clickY = input.Position.Y
+        local mPos = UserInputService:GetMouseLocation()
+        local clickX = mPos.X
+        local clickY = mPos.Y
 
         if ColorPicker.Window.Visible then
             ColorPicker.Close()
@@ -3134,9 +3137,9 @@ end)
 
 UserInputService.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement then
-        local mousePos = input.Position
-        local mx = mousePos.X
-        local my = mousePos.Y
+        local mPos = UserInputService:GetMouseLocation()
+        local mx = mPos.X
+        local my = mPos.Y
 
         if activeGraphDrag then
             activeGraphDrag.update(mx, my)
@@ -3266,30 +3269,29 @@ UserInputService.InputChanged:Connect(function(input)
         elseif ColorPicker.Window.Visible or ContextMenu.Visible then
             -- Dragging of other elements (sliders, window, etc.) strictly blocked while modal is open
         elseif activeSlider then
-            activeSlider.update(input.Position.X)
+            activeSlider.update(mx)
         elseif isDraggingWM then
-            local deltaX = input.Position.X - wmDragStart.X
-            local deltaY = input.Position.Y - wmDragStart.Y
+            local deltaX = mx - wmDragStart.X
+            local deltaY = my - wmDragStart.Y
             local rawOffset = wmStartOffset + Vector2.new(deltaX, deltaY)
             wmTargetOffset = clampWatermarkOffset(rawOffset)
         elseif isDraggingKB then
-            local deltaX = input.Position.X - kbDragStart.X
-            local deltaY = input.Position.Y - kbDragStart.Y
+            local deltaX = mx - kbDragStart.X
+            local deltaY = my - kbDragStart.Y
             local rawOffset = kbStartOffset + Vector2.new(deltaX, deltaY)
             kbTargetOffset = clampKeybindsOffset(rawOffset)
         elseif isDragging then
-            local deltaX = input.Position.X - dragStart.X
-            local deltaY = input.Position.Y - dragStart.Y
+            local deltaX = mx - dragStart.X
+            local deltaY = my - dragStart.Y
             local rawOffset = startPos + Vector2.new(deltaX, deltaY)
             targetOffset = clampMainFrameOffset(rawOffset)
         end
     elseif input.UserInputType == Enum.UserInputType.MouseWheel then
         -- Smooth Zero-GPE Mouse Wheel scrolling for Column cards
         local scrollDelta = input.Position.Z
-        local mouse = UserInputService:GetMouseLocation()
-        local inset = GuiService:GetGuiInset()
-        local mx = mouse.X - inset.X
-        local my = mouse.Y - inset.Y
+        local mPos = UserInputService:GetMouseLocation()
+        local mx = mPos.X
+        local my = mPos.Y
 
 
 
@@ -4199,8 +4201,32 @@ end
                     TweenService:Create(Switch, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = targetColor}):Play()
                     TweenService:Create(Knob, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetKnobPos}):Play()
                     updateKeybindDisplay()
-                    pcall(callback, state)
+                    local ok, err = pcall(callback, state)
+                    if not ok and err then
+                        warn("[DeadHub Toggle Error]: " .. tostring(err))
+                    end
                 end
+
+                table.insert(clickableRegistry, {
+                    object = SwitchHitbox,
+                    onClick = function()
+                        if hasKeybind and mode == "always" then
+                            setToggle(true)
+                        else
+                            setToggle(not state)
+                        end
+                    end,
+                    onHover = function(isHovered)
+                        TweenService:Create(SwitchStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                            Color = isHovered and (state and Color3.fromRGB(50, 205, 255) or Color3.fromRGB(80, 86, 106)) or Color3.fromRGB(50, 54, 66)
+                        }):Play()
+                        if not state then
+                            TweenService:Create(Switch, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                                BackgroundColor3 = isHovered and Color3.fromRGB(36, 36, 44) or Color3.fromRGB(28, 28, 34)
+                            }):Play()
+                        end
+                    end
+                })
 
                 table.insert(clickableRegistry, {
                     object = KeybindBtn,
