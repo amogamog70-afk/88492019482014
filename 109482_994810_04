@@ -2741,6 +2741,26 @@ local function updateContextMenuUI()
     end
 end
 
+local function openContextMenuForItem(item)
+    if not item then return end
+    activeContextItem = item
+    isListeningKeybind = false
+    updateContextMenuUI()
+
+    local anchor = (item.keybindBtn and item.keybindBtn.Visible and item.keybindBtn) or item.switch or item.row or item.object
+    local sp = anchor.AbsolutePosition
+    local ss = anchor.AbsoluteSize
+    local vp = getViewportSize()
+    local targetX = sp.X - 150
+    if targetX < 10 then
+        targetX = sp.X + ss.X + 8
+    end
+    targetX = math.clamp(targetX, 10, math.max(10, vp.X - 150))
+    local targetY = math.clamp(sp.Y - 10, 10, math.max(10, vp.Y - 145))
+    ContextMenu.Position = UDim2.fromOffset(targetX, targetY)
+    ContextMenu.Visible = true
+end
+
 -- Unified single InputBegan handler: processes clicks, context menus, and bound key triggers
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if isListeningKeybind and activeContextItem then
@@ -3015,24 +3035,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
         if MainFrame.Visible and menuOpen then
             for _, item in ipairs(rightClickRegistry) do
-                local isHit = (item.keybindBtn and item.keybindBtn.Visible and isInside(clickX, clickY, item.keybindBtn)) or (item.object and isInside(clickX, clickY, item.object))
+                local isHit = (item.keybindBtn and item.keybindBtn.Visible and isInside(clickX, clickY, item.keybindBtn))
+                    or (item.row and isInside(clickX, clickY, item.row))
+                    or (item.object and isInside(clickX, clickY, item.object))
                 if isHit then
-                    activeContextItem = item
-                    isListeningKeybind = false
-                    updateContextMenuUI()
-
-                    local anchor = (item.keybindBtn and item.keybindBtn.Visible and item.keybindBtn) or item.switch or item.object
-                    local sp = anchor.AbsolutePosition
-                    local ss = anchor.AbsoluteSize
-                    local vp = getViewportSize()
-                    local targetX = sp.X - 150
-                    if targetX < 10 then
-                        targetX = sp.X + ss.X + 8
-                    end
-                    targetX = math.clamp(targetX, 10, math.max(10, vp.X - 150))
-                    local targetY = math.clamp(sp.Y - 10, 10, math.max(10, vp.Y - 145))
-                    ContextMenu.Position = UDim2.fromOffset(targetX, targetY)
-                    ContextMenu.Visible = true
+                    openContextMenuForItem(item)
                     return
                 end
             end
@@ -4209,6 +4216,11 @@ end
                             return
                         end
 
+                        if hasKeybind and boundKey ~= nil and mode == "hold" then
+                            openContextMenuForItem(thisRightClickItem)
+                            return
+                        end
+
                         if hasKeybind and mode == "always" then
                             setToggle(true)
                         else
@@ -4234,12 +4246,12 @@ end
                     object = KeybindBtn,
                     onClick = function()
                         if not hasKeybind then return end
-                        activeContextItem = thisRightClickItem
-                        isListeningKeybind = not isListeningKeybind
-                        listenStartTick = tick()
-                        updateKeybindDisplay()
-                        if ContextMenu.Visible then
-                            updateContextMenuUI()
+                        if ContextMenu.Visible and activeContextItem == thisRightClickItem then
+                            ContextMenu.Visible = false
+                            isListeningKeybind = false
+                            activeContextItem = nil
+                        else
+                            openContextMenuForItem(thisRightClickItem)
                         end
                     end,
                     onHover = function(isHovered)
@@ -4253,6 +4265,7 @@ end
                 thisRightClickItem = {
                     id = toggleId,
                     object = SwitchHitbox,
+                    row = Row,
                     switch = Switch,
                     keybindBtn = KeybindBtn,
                     name = toggleName,
@@ -4262,6 +4275,16 @@ end
                         mode = newMode
                         if mode == "always" then
                             setToggle(true)
+                        elseif mode == "hold" then
+                            local isHeld = false
+                            if boundKey then
+                                if boundKey == Enum.UserInputType.MouseButton1 or boundKey == Enum.UserInputType.MouseButton2 or boundKey == Enum.UserInputType.MouseButton3 then
+                                    isHeld = UserInputService:IsMouseButtonPressed(boundKey)
+                                elseif typeof(boundKey) == "EnumItem" and boundKey.EnumType == Enum.KeyCode then
+                                    isHeld = UserInputService:IsKeyDown(boundKey)
+                                end
+                            end
+                            setToggle(isHeld)
                         end
                         updateKeybindDisplay()
                     end,
@@ -4269,6 +4292,17 @@ end
                     setKey = function(newKey)
                         boundKey = newKey
                         hasKeybind = (boundKey ~= nil or mode == "always")
+                        if mode == "hold" then
+                            local isHeld = false
+                            if boundKey then
+                                if boundKey == Enum.UserInputType.MouseButton1 or boundKey == Enum.UserInputType.MouseButton2 or boundKey == Enum.UserInputType.MouseButton3 then
+                                    isHeld = UserInputService:IsMouseButtonPressed(boundKey)
+                                elseif typeof(boundKey) == "EnumItem" and boundKey.EnumType == Enum.KeyCode then
+                                    isHeld = UserInputService:IsKeyDown(boundKey)
+                                end
+                            end
+                            setToggle(isHeld)
+                        end
                         updateKeybindDisplay()
                     end,
                     toggle = function()
@@ -5134,9 +5168,17 @@ end
 
             -- 7. Add Multiselect (Multi-Select Dropdown with Checkboxes)
             function Column:AddMultiselect(msName, optionsList, defaultSelected, callback)
-                optionsList = optionsList or {}
-                defaultSelected = defaultSelected or {}
-                callback = callback or function() end
+                if type(msName) == "table" then
+                    local cfg = msName
+                    msName = cfg.Name or "Multiselect"
+                    optionsList = cfg.Options or {}
+                    defaultSelected = cfg.Default or {}
+                    callback = cfg.Callback or cfg.callback or function() end
+                else
+                    optionsList = optionsList or {}
+                    defaultSelected = defaultSelected or {}
+                    callback = callback or function() end
+                end
 
                 local selectedDict = {}
                 if #defaultSelected > 0 then
