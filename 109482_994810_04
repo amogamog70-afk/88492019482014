@@ -4292,6 +4292,13 @@ end
                 end
 
                 local toggleObj = {
+                    Row = Row,
+                    SetVisible = function(self, vis)
+                        Row.Visible = (vis == true)
+                    end,
+                    GetVisible = function(self)
+                        return Row.Visible
+                    end,
                     Set = function(self, val) setToggle(val) end,
                     Get = function(self) return state end,
                     AddKeybind = function(self, k, m)
@@ -4471,6 +4478,13 @@ end
                 })
 
                 return {
+                    Row = Row,
+                    SetVisible = function(self, vis)
+                        Row.Visible = (vis == true)
+                    end,
+                    GetVisible = function(self)
+                        return Row.Visible
+                    end,
                     Fire = function() pcall(callback) end
                 }
             end
@@ -4773,6 +4787,13 @@ end
                 }
 
                 return {
+                    Row = Row,
+                    SetVisible = function(self, vis)
+                        Row.Visible = (vis == true)
+                    end,
+                    GetVisible = function(self)
+                        return Row.Visible
+                    end,
                     Set = function(self, v) setSlider(v) end,
                     Get = function(self) return curVal end
                 }
@@ -5092,6 +5113,13 @@ end
                 }
 
                 return {
+                    Row = Row,
+                    SetVisible = function(self, vis)
+                        Row.Visible = (vis == true)
+                    end,
+                    GetVisible = function(self)
+                        return Row.Visible
+                    end,
                     Set = function(self, val)
                         updateDisplay(val)
                         pcall(callback, val)
@@ -5253,6 +5281,13 @@ end
                 }
 
                 return {
+                    Row = Row,
+                    SetVisible = function(self, vis)
+                        Row.Visible = (vis == true)
+                    end,
+                    GetVisible = function(self)
+                        return Row.Visible
+                    end,
                     Set = function(self, key, state)
                         selectedDict[key] = (state == true)
                         updateDisplay(selectedDict)
