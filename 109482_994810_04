@@ -3949,7 +3949,7 @@ end
                     local cfg = toggleName
                     toggleName = cfg.Name or "Toggle"
                     defaultState = cfg.Default ~= nil and cfg.Default or false
-                    arg3 = cfg.Callback
+                    arg3 = cfg.Callback or cfg.callback
                     if cfg.Color then
                         initialColor = cfg.Color
                         colorCallback = cfg.ColorCallback
@@ -4246,27 +4246,6 @@ end
                         if not isListeningKeybind or activeContextItem ~= thisRightClickItem then
                             KeybindStroke.Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(44, 48, 62)
                             KeybindBtn.BackgroundColor3 = isHovered and Color3.fromRGB(28, 30, 38) or Color3.fromRGB(22, 24, 30)
-                        end
-                    end
-                })
-
-                table.insert(clickableRegistry, {
-                    object = SwitchHitbox,
-                    onClick = function()
-                        if hasKeybind and mode == "always" then
-                            setToggle(true)
-                        else
-                            setToggle(not state)
-                        end
-                    end,
-                    onHover = function(isHovered)
-                        TweenService:Create(SwitchStroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                            Color = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(50, 54, 66)
-                        }):Play()
-                        if not state then
-                            TweenService:Create(Switch, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-                                BackgroundColor3 = isHovered and Color3.fromRGB(36, 36, 44) or Color3.fromRGB(28, 28, 34)
-                            }):Play()
                         end
                     end
                 })
