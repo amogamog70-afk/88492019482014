@@ -2340,10 +2340,21 @@ do
                 Keybind.Items = Items
             end
 
+            local isUIBind = (Data.Flag == "UIBind") or (Data.Name == "UI Bind")
+            local defaultShowInList = true
+            if Data.ShowInKeybindsList ~= nil then
+                defaultShowInList = Data.ShowInKeybindsList
+            elseif isUIBind then
+                defaultShowInList = false
+            end
+
             local KeybindObject
 
             if Library.KeyList then
                 KeybindObject = Library.KeyList:Add("", "", "")
+                if not defaultShowInList then
+                    KeybindObject:SetVis(false)
+                end
             end
 
             local Update = function()
@@ -2351,6 +2362,16 @@ do
                     KeybindObject:SetStatus(Keybind.Toggled)
                     KeybindObject:Set(Keybind.Value, Data.Name, Keybind.Mode)
                 end
+            end
+
+            if isUIBind then
+                Library:BindToWindowVisibility(function(isOpen)
+                    Keybind.Toggled = isOpen
+                    if Flags[Keybind.Flag] and type(Flags[Keybind.Flag]) == "table" then
+                        Flags[Keybind.Flag].Toggled = isOpen
+                    end
+                    Update()
+                end)
             end
 
             local Debounce = false
@@ -2392,7 +2413,7 @@ do
                 Name = "Show in keybinds list",
                 Flag = Data.Flag .. "ShowInKeybindsList",
                 Parent = Items["KeybindWindow"],
-                Default = true,
+                Default = defaultShowInList,
                 Callback = function(Value)
                     if KeybindObject then
                         KeybindObject:SetVis(Value)
@@ -2495,7 +2516,9 @@ do
             end
 
             function Keybind:Press(Bool)
-                if Keybind.Mode == "Toggle" then
+                if isUIBind then
+                    Keybind.Toggled = Library.WindowOpenState
+                elseif Keybind.Mode == "Toggle" then
                     Keybind.Toggled = not Keybind.Toggled
                 elseif Keybind.Mode == "Hold" then
                     Keybind.Toggled = Bool
@@ -10513,6 +10536,7 @@ do
                     Flag = "UIBind",
                     Mode = "Toggle",
                     Default = Enum.KeyCode.RightShift,
+                    ShowInKeybindsList = false,
                     Callback = function(Value)
                         Library.MenuKeybind = Flags["UIBind"].Key
                     end
