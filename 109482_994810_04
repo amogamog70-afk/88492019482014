@@ -231,7 +231,8 @@ do
             ["Section"] = Color3.fromRGB(20, 21, 25),
             ["Element"] = Color3.fromRGB(28, 29, 35),
             ["Hovered Element"] = Color3.fromRGB(36, 38, 45),
-            ["Inactive Text"] = Color3.fromRGB(100, 100, 100)
+            ["Inactive Text"] = Color3.fromRGB(100, 100, 100),
+            ["Keybind Active"] = Color3.fromRGB(152, 188, 255)
         }
     }
 
@@ -2994,34 +2995,58 @@ do
 
             function KeybindList:Add(Key, Name, Mode)
                 local CanShowInKeybindsList = true
+                local IsActive = false
 
                 local NewKey = Library:Create("TextLabel", {
                     Name = "\0",
                     FontFace = Library.Font,
                     TextSize = Library.FontSize,
                     Parent = Items["Content"].Instance,
-                    TextColor3 = Library.Theme["Text"],
+                    TextColor3 = Library.Theme["Inactive Text"],
                     Text = Key .. " - " .. Name .. " - " .. Mode,
                     BackgroundTransparency = 1,
                     Size = UDim2.new(0, 0, 0, 15),
                     BorderSizePixel = 0,
                     AutomaticSize = Enum.AutomaticSize.X
-                }):AddToTheme({ TextColor3 = 'Text' })
+                }):AddToTheme({
+                    TextColor3 = function()
+                        if IsActive then
+                            return Library.Theme["Keybind Active"] or Library.Theme["Accent"] or Color3.fromRGB(255, 255, 255)
+                        else
+                            return Library.Theme["Inactive Text"] or Color3.fromRGB(115, 115, 115)
+                        end
+                    end
+                })
+
+                local function UpdateVisuals()
+                    if IsActive then
+                        NewKey.Instance.TextColor3 = Library.Theme["Keybind Active"] or Library.Theme["Accent"] or Color3.fromRGB(255, 255, 255)
+                    else
+                        NewKey.Instance.TextColor3 = Library.Theme["Inactive Text"] or Color3.fromRGB(115, 115, 115)
+                    end
+                end
 
                 function NewKey:Set(Key, Name, Mode)
                     NewKey.Instance.Text = Key .. " - " .. Name .. " - " .. Mode
+                    UpdateVisuals()
                 end
 
                 function NewKey:SetStatus(Bool)
+                    IsActive = (Bool == true)
                     if not CanShowInKeybindsList then
-                        Bool = false
+                        NewKey.Instance.Visible = false
+                        return
                     end
-
-                    NewKey.Instance.Visible = Bool
+                    NewKey.Instance.Visible = true
+                    UpdateVisuals()
                 end
 
                 function NewKey:SetVis(Bool)
                     CanShowInKeybindsList = Bool
+                    NewKey.Instance.Visible = Bool
+                    if Bool then
+                        UpdateVisuals()
+                    end
                 end
 
                 return NewKey
@@ -3165,10 +3190,10 @@ do
                     return
                 end
 
-                local MainPos = MainWindow.Position
+                local MainPos = MainWindow.AbsolutePosition
                 local MainSize = MainWindow.AbsoluteSize
 
-                Frame.Position = UDim2.new(0, MainPos.X.Offset + MainSize.X + 10, 0, MainPos.Y.Offset)
+                Frame.Position = UDim2.new(0, MainPos.X + MainSize.X + 12, 0, MainPos.Y)
             end
 
             local Items = {}
