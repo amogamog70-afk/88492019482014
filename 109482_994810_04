@@ -2711,8 +2711,8 @@ do
                 Items["Watermark"] = Library:Create("Frame", {
                     Name = "\0",
                     Parent = Library.Holder.Instance,
-                    AnchorPoint = Vector2.new(0.5, 0),
-                    Position = UDim2.new(0.5, 0, 0, 42),
+                    AnchorPoint = Vector2.new(0, 0),
+                    Position = UDim2.new(0, 16, 0, 16),
                     Size = UDim2.new(0, 0, 0, 25),
                     BorderSizePixel = 0,
                     AutomaticSize = Enum.AutomaticSize.X,
@@ -5632,7 +5632,8 @@ do
                 Items["SpotifyPlayer"] = Library:Create("Frame", {
                     Name = "\0",
                     Parent = Library.Holder.Instance,
-                    Position = UDim2.new(0, 30, 0, 240),
+                    AnchorPoint = Vector2.new(1, 1),
+                    Position = UDim2.new(1, -16, 1, -16),
                     Size = CollapsedSize,
                     BorderSizePixel = 0,
                     BackgroundColor3 = Library.Theme["Background"],
@@ -10446,9 +10447,117 @@ do
         Library.CreateSettingsPage = function(Self)
             local Page = Self:Page({ Name = "Settings", Icon = "rbxassetid://0" })
 
-            local ConfigsSubPage = Page:SubPage({ Name = "Configs" })
-            local OtherSubPage = Page:SubPage({ Name = "Other" })
+            local ThemingSubPage  = Page:SubPage({ Name = "Theming" })
+            local WidgetsSubPage  = Page:SubPage({ Name = "Widgets" })
+            local SettingsSubPage = Page:SubPage({ Name = "Menu" })
+            local ConfigsSubPage  = Page:SubPage({ Name = "Configs" })
 
+            -- 1. THEMING (Цвета и оформление темы)
+            do
+                local ThemingSectionLeft  = ThemingSubPage:Section({ Name = "Main Colors", Side = 1 })
+                local ThemingSectionRight = ThemingSubPage:Section({ Name = "Borders & Accents", Side = 2 })
+
+                local LeftKeys = { "Background", "Section", "Element", "Hovered Element", "Text", "Inactive Text" }
+                for _, Index in ipairs(LeftKeys) do
+                    if Library.Theme[Index] then
+                        ThemingSectionLeft:Label({ Name = Index }):Colorpicker({
+                            Flag = Index .. "Theme",
+                            Default = Library.Theme[Index],
+                            Callback = function(Value)
+                                Library.Theme[Index] = Value
+                                Library:ChangeTheme(Index, Value)
+                            end
+                        })
+                    end
+                end
+
+                local RightKeys = { "Accent", "Keybind Active", "Outline", "Border", "Border 2", "Light Border", "Risky" }
+                for _, Index in ipairs(RightKeys) do
+                    if Library.Theme[Index] then
+                        ThemingSectionRight:Label({ Name = Index }):Colorpicker({
+                            Flag = Index .. "Theme",
+                            Default = Library.Theme[Index],
+                            Callback = function(Value)
+                                Library.Theme[Index] = Value
+                                Library:ChangeTheme(Index, Value)
+                            end
+                        })
+                    end
+                end
+            end
+
+            -- 2. WIDGETS (Управление всеми окнами и виджетами)
+            do
+                local WidgetsSection = WidgetsSubPage:Section({ Name = "Widgets", Side = 1 })
+                for _, WidgetData in Library.SettingsWidgets do
+                    local WidgetToggle = WidgetsSection:Toggle({
+                        Name = WidgetData.Name,
+                        Flag = WidgetData.Flag,
+                        Default = WidgetData.Default,
+                        Callback = WidgetData.Callback
+                    })
+
+                    if type(WidgetData.Settings) == "function" then
+                        local WidgetSettings = WidgetToggle:Settings()
+                        WidgetData.Settings(WidgetSettings, WidgetToggle)
+                    end
+                end
+            end
+
+            -- 3. MENU (Настройки интерфейса, клавиша меню, эффекты)
+            do
+                local MenuSectionLeft  = SettingsSubPage:Section({ Name = "Controls", Side = 1 })
+                local MenuSectionRight = SettingsSubPage:Section({ Name = "Effects & Unload", Side = 2 })
+
+                MenuSectionLeft:Label({ Name = "UI Bind" }):Keybind({
+                    Flag = "UIBind",
+                    Mode = "Toggle",
+                    Default = Enum.KeyCode.RightShift,
+                    Callback = function(Value)
+                        Library.MenuKeybind = Flags["UIBind"].Key
+                    end
+                })
+
+                MenuSectionLeft:Slider({
+                    Name = "Animation Speed",
+                    Flag = "AnimationSpeed",
+                    Default = Library.Animation.Time,
+                    Min = 0,
+                    Max = 1.5,
+                    Decimals = .01,
+                    Suffix = "s",
+                    Callback = function(Value)
+                        Library.Animation.Time = Value
+                    end
+                })
+
+                MenuSectionRight:Toggle({
+                    Name = "Background Blur",
+                    Flag = "UIBackgroundBlur",
+                    Default = Library.BackgroundBlurEnabled,
+                    Callback = function(Value)
+                        Library:SetBackgroundBlurEnabled(Value)
+                    end
+                })
+
+                MenuSectionRight:Toggle({
+                    Name = "Background Snow",
+                    Flag = "UIBackgroundSnow",
+                    Default = Library.BackgroundSnowEnabled,
+                    Callback = function(Value)
+                        Library:SetBackgroundSnowEnabled(Value)
+                    end
+                })
+
+                MenuSectionRight:Button({
+                    Name = "Unload Library",
+                    Callback = function()
+                        Library:Exit()
+                    end
+                })
+            end
+
+            -- 4. CONFIGS (Управление конфигурациями)
             do
                 local ConfigName
                 local ConfigSelected
@@ -10456,10 +10565,6 @@ do
 
                 local ConfigsSection = ConfigsSubPage:Section({ Name = "Configs", Side = 1 })
                 do
-                    local ConfigName
-                    local ConfigSelected
-                    local ConfigsFolder = Library.Directory .. Library.Folders.Configs .. "/"
-
                     local ConfigsDropdown = ConfigsSection:Dropdown({
                         Name = "Configs",
                         Flag = "ConfigsDropdown",
@@ -10574,88 +10679,6 @@ do
                     })
 
                     Library:GetConfigsList(ConfigsDropdown)
-                end
-            end
-
-            do
-                local ThemingSection = OtherSubPage:Section({ Name = "Theming", Side = 1 })
-                do
-                    for Index, Value in Library.Theme do
-                        ThemingSection:Label({ Name = Index }):Colorpicker({
-                            Flag = Index .. "Theme",
-                            Default = Value,
-                            Callback = function(Value)
-                                Library.Theme[Index] = Value
-                                Library:ChangeTheme(Index, Value)
-                            end
-                        })
-                    end
-                end
-
-                local SettingsSection = OtherSubPage:Section({ Name = "Settings", Side = 2 })
-                do
-                    SettingsSection:Label({ Name = "UI Bind" }):Keybind({
-                        Flag = "UIBind",
-                        Mode = "Toggle",
-                        Default = Enum.KeyCode.RightShift,
-                        Callback = function(Value)
-                            Library.MenuKeybind = Flags["UIBind"].Key
-                        end
-                    })
-
-                    SettingsSection:Toggle({
-                        Name = "Background Blur",
-                        Flag = "UIBackgroundBlur",
-                        Default = Library.BackgroundBlurEnabled,
-                        Callback = function(Value)
-                            Library:SetBackgroundBlurEnabled(Value)
-                        end
-                    })
-
-                    SettingsSection:Toggle({
-                        Name = "Background Snow",
-                        Flag = "UIBackgroundSnow",
-                        Default = Library.BackgroundSnowEnabled,
-                        Callback = function(Value)
-                            Library:SetBackgroundSnowEnabled(Value)
-                        end
-                    })
-
-                    SettingsSection:Button({
-                        Name = "Unload",
-                        Callback = function()
-                            Library:Exit()
-                        end
-                    })
-
-                    SettingsSection:Slider({
-                        Name = "Animation Speed",
-                        Flag = "AnimationSpeed",
-                        Default = Library.Animation.Time,
-                        Min = 0,
-                        Max = 1.5,
-                        Decimals = .01,
-                        Callback = function(Value)
-                            Library.Animation.Time = Value
-                        end
-                    })
-                end
-
-                local WidgetsSection = OtherSubPage:Section({ Name = "Widgets", Side = 2 })
-                do
-                    for _, WidgetData in Library.SettingsWidgets do
-                        local WidgetToggle = WidgetsSection:Toggle({
-                            Name = WidgetData.Name,
-                            Flag = WidgetData.Flag,
-                            Default = WidgetData.Default,
-                            Callback = WidgetData.Callback
-                        })
-
-                        if type(WidgetData.Settings) == "function" then
-                            local WidgetSettings = WidgetToggle:Settings()
-                            WidgetData.Settings(WidgetSettings, WidgetToggle)
-                        end
-                    end
                 end
             end
         end
